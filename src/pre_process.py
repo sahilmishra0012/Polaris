@@ -145,7 +145,7 @@ def pre_process_mag(args, outID=True):
     negsamples = args.negsamples
 
     def get_n_hop_neighbors(start_node, taxo_forward, taxo_reverse, max_hops=2):
-      
+
         neighbors = set()
         queue = deque([(start_node, 0)])
         visited = {start_node}
@@ -737,6 +737,6 @@ if __name__ == '__main__':
     #     "../data/computer_science/computer_science.taxo")
     # terms_to_json("../data/wordnet_verb/wordnet_verb.desc")
     create_child_to_parents_map(
-        "../data/computer_science/computer_science.taxo", "computer_science")
+        "../data/wordnet_verb/wordnet_verb.taxo", "wordnet_verb")
     # terms_to_json("../data/wordnet_verb/wordnet_verb.desc", "wordnet_verb")
     # id_to_json("../data/semeval_food/semeval_food.terms", "semeval_food")

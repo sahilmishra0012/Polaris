@@ -2,15 +2,15 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import math
+from layers import SphericalLinear, SphericalTanh
+try:
+    from torch.special import i0
+except ImportError:
+    from torch import i0
 
 
 def log_i0_stable(x):
     threshold = 20.0
-
-    try:
-        from torch.special import i0
-    except ImportError:
-        from torch import i0
 
     mask = x < threshold
 
@@ -54,9 +54,12 @@ class VMFRegularisation(nn.Module):
         self.embedding_dim = embedding_dim
         self.kappa_predictor = nn.Sequential(nn.Linear(
             embedding_dim, hidden_dim), nn.ReLU(), nn.Linear(hidden_dim, 1), nn.Softplus())
+        self.mu_predictor = nn.Sequential(SphericalLinear(
+            embedding_dim, hidden_dim), SphericalTanh(), SphericalLinear(hidden_dim, embedding_dim))
 
     def forward(self, p_emb, c_emb, n_emb, margin=1):
-        mu_p, mu_c, mu_n = p_emb, c_emb, n_emb
+        mu_p, mu_c, mu_n = self.mu_predictor(
+            p_emb), self.mu_predictor(c_emb), self.mu_predictor(n_emb)
         kappa_p = self.kappa_predictor(p_emb)
         kappa_c = self.kappa_predictor(c_emb)
         kappa_n = self.kappa_predictor(n_emb)

@@ -100,6 +100,15 @@ class SphericalReLU(nn.Module):
         return x
 
 
+class SphericalTanh(nn.Module):
+    def __init__(self):
+        super(SphericalTanh, self).__init__()
+
+    def forward(self, x):
+
+        return F.normalize(torch.tanh(x), p=2, dim=-1)
+
+
 class SphericalMLP(nn.Module):
     def __init__(self, input_dim, hidden, output_dim, bias=False):
         super(SphericalMLP, self).__init__()

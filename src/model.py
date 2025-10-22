@@ -22,26 +22,6 @@ class PolarTaxo(nn.Module):
 
         self.pre_train_model = self.__load_pre_trained__()
 
-        # self.par_projection_h = MLP(
-        #     input_dim=768, hidden=self.args.hidden, output_dim=1)
-        self.par_projection_theta = MLP(
-            input_dim=767, hidden=self.args.hidden, output_dim=self.args.embed_size)
-
-        # self.child_projection_h = MLP(
-        #     input_dim=1, hidden=self.args.hidden, output_dim=1)
-        self.child_projection_theta = MLP(
-            input_dim=767, hidden=self.args.hidden, output_dim=self.args.embed_size)
-
-        # self.dropout = nn.Dropout(self.args.dropout)
-
-        # self.child_sphere_projection = SphericalProjectionHead(
-        #     self.args, 768, self.args.embed_size+2, self.args.embed_size)
-        # self.parent_sphere_projection = SphericalProjectionHead(
-        #     self.args, 768, self.args.embed_size+2, self.args.embed_size
-        # )
-        # self.child_sphere_projection = CartesianToPolarConverter()
-        # self.parent_sphere_projection = CartesianToPolarConverter()
-
         # Spherical
         self.vmf_regulariser = VMFRegularisation(
             embedding_dim=self.args.embed_size, hidden_dim=self.args.hidden)
@@ -75,15 +55,6 @@ class PolarTaxo(nn.Module):
 
         return cls_embed
 
-    def positive_last_dim_bert(self, x):
-        x_pos = x.clone()
-
-        last = x[..., -1]
-        last_pos = last.abs().detach()+(last-last.detach())
-        x_pos[..., -1] = last_pos
-
-        return x_pos
-
     def par_projection(self, cls_embed):
 
         cls_embeddings = self.get_cls(cls_embed)
@@ -93,23 +64,6 @@ class PolarTaxo(nn.Module):
         e = self.parent_sphere(v_sphere)
 
         return e
-
-        # We are on the surface of the sphere
-
-        # theta = self.par_projection_h(self.get_cls(cls_embed))
-        # psi = self.par_projection_theta(self.get_cls(cls_embed))
-
-        # theta = 2*torch.pi*F.sigmoid(theta)
-        # psi = torch.pi*F.sigmoid(psi)
-        # theta, psi = self.parent_sphere_projection(self.get_cls(cls_embed))
-
-        # cls_embeddings = self.get_cls(cls_embed)
-        # cls_embeddings = self.positive_last_dim_bert(cls_embeddings)
-        # psi_bert = self.parent_sphere_projection(cls_embeddings)
-        # psi_proj = self.par_projection_theta(psi_bert)
-        # psi_proj = F.sigmoid(psi_proj)*torch.pi
-
-        # return psi_proj
 
     def child_projection(self, cls_embed):
 
@@ -121,21 +75,6 @@ class PolarTaxo(nn.Module):
 
         return e
 
-        # theta = self.child_projection_h(self.get_cls(cls_embed))
-        # psi = self.child_projection_theta(self.get_cls(cls_embed))
-
-        # theta = 2*torch.pi*F.sigmoid(theta)
-        # psi = torch.pi*F.sigmoid(psi)
-
-        # theta = 2*torch.pi*F.sigmoid(theta)
-        # psi = torch.pi*F.sigmoid(psi)
-        # cls_embeddings = self.get_cls(cls_embed)
-        # cls_embeddings = self.positive_last_dim_bert(cls_embeddings)
-        # psi = self.child_sphere_projection(cls_embeddings)
-        # psi_proj = self.child_projection_theta(psi)
-        # psi_proj = F.sigmoid(psi_proj)*torch.pi
-
-        # return psi_proj
     def to_polar(self, e):
 
         batch_size, d = e.shape
@@ -180,17 +119,6 @@ class PolarTaxo(nn.Module):
         self.child_sphere.l1.normalize_weights()
         self.child_sphere.l2.normalize_weights()
 
-    def longitude_distance(self, angles1, angles2):
-        direct = torch.sum(torch.abs(angles1 - angles2),
-                           dim=1, keepdim=True)   # [B,1]
-        wrapped = torch.sum(
-            torch.abs(2*torch.pi - angles1 - angles2), dim=1, keepdim=True)
-
-        return torch.min(direct, wrapped)
-
-    def latitude_distance(self, angles1, angles2):
-        return torch.sum(torch.abs(angles1-angles2), dim=1, keepdim=True)
-
     def welsch_loss(self, d):
 
         w_loss = (self.args.c**2/2)*(1 -
@@ -204,38 +132,6 @@ class PolarTaxo(nn.Module):
         child_sphere = self.child_projection(encode_child)
         negative_sphere = self.par_projection(encode_negative)
 
-        # # move these to the spherical coordinate system (theta,psi,psi1....)
-        # parent_angles = self.to_polar(parent_sphere)
-        # child_angles = self.to_polar(child_sphere)
-        # negative_angles = self.to_polar(negative_sphere)
-
-        # # Note that psi is between 0 to 2pi(longitudinal) and psis is 0 to pi.
-        # parent_psi = parent_angles[:, -1].view(parent_angles.size(0), 1)
-        # child_psi = child_angles[:, -1].view(parent_angles.size(0), 1)
-        # negative_psi = negative_angles[:, -1].view(parent_angles.size(0), 1)
-
-        # parent_thetas = parent_angles[:, :-1]
-        # child_thetas = child_angles[:, :-1]
-        # negative_thetas = negative_angles[:, :-1]
-
-        # pos_long_distance = self.longitude_distance(parent_psi, child_psi)
-        # neg_long_distanc = self.longitude_distance(negative_psi, child_psi)
-        # pos_lat_distance = self.latitude_distance(parent_thetas, child_thetas)
-        # neg_lat_distance = self.latitude_distance(
-        #     negative_thetas, child_thetas)
-
-        # # For longitude
-        # welsch_long_cp = torch.log(self.welsch_loss(pos_long_distance))
-        # welsch_long_cn = torch.log(self.welsch_loss(neg_long_distanc))
-        # loss_longtiude = F.relu(
-        #     welsch_long_cp-welsch_long_cn+self.args.beta).mean()
-
-        # # for latitude
-        # welsch_lat_cp = torch.log(self.welsch_loss(pos_lat_distance))
-        # welsch_lat_cn = torch.log(self.welsch_loss(neg_lat_distance))
-        # loss_latitude = F.relu(
-        #     welsch_lat_cp-welsch_lat_cn+self.args.beta).mean()
-
         dot_cp = torch.sum(parent_sphere*child_sphere, dim=1)
         dot_cn = torch.sum(negative_sphere*child_sphere, dim=1)
 
@@ -248,49 +144,7 @@ class PolarTaxo(nn.Module):
         welsch_cp = torch.log(self.welsch_loss(ang_distcp))
         welsch_cn = torch.log(self.welsch_loss(ang_distcn))
 
-        # svgd_loss = self.svgd_loss(
-        #     parent_sphere, child_sphere, negative_sphere)
-
-        loss = F.relu(welsch_cp-welsch_cn+self.args.beta).mean()+self.vmf_regulariser(
+        loss = self.args.geometric_weight*F.relu(welsch_cp-welsch_cn+self.args.beta).mean()+self.args.probabilistic_weight*self.vmf_regulariser(
             parent_sphere, child_sphere, negative_sphere, self.args.vmf_margin)
 
         return loss
-
-        # latitude_distance = F.relu(self.args.beta+self.welsch_loss(self.latitude_distance(
-        #     parent_theta, child_theta))-self.welsch_loss(self.latitude_distance(negative_theta, child_theta)))
-        # longitude_distance = F.relu(self.args.beta+self.welsch_loss(self.longitude_distance(
-        #     parent_psi, child_psi))-self.welsch_loss(self.longitude_distance(negative_psi, child_psi)))
-
-        # angle_loss = (self.args.lat_weight*latitude_distance +
-        #               self.args.long_weight*longitude_distance).mean()
-
-        # # margin_sq = self.args.beta**2
-        # if (step+1) % 25 == 0:
-        #     self.plot_and_save_distributions(child_theta, child_psi, step)
-
-        # all_thetas = torch.cat(
-        #     [parent_theta, child_theta, negative_theta], dim=0)
-
-        # all_psis = torch.cat([parent_psi, child_psi, negative_psi], dim=0)
-        # svgd_loss = self.compute_svgd_uniformity(all_thetas, all_psis)
-
-        # loss = angle_loss+0.1*svgd_loss
-
-        # return loss
-        # parent_psi = self.par_projection(encode_parent)
-        # child_psi = self.child_projection(encode_child)
-        # negative_psi = self.par_projection(encode_negative)
-
-        # latitude_distance = F.relu(self.args.beta+self.welsch_loss(self.latitude_distance(
-        #     parent_psi, child_psi))-self.welsch_loss(self.latitude_distance(negative_psi, child_psi)))
-
-        # if (step+1) % 25 == 0:
-        #     self.plot_psi_distributions(
-        #         step, parent_psi, child_psi, negative_psi)
-
-        # psis = torch.cat([parent_psi, child_psi, negative_psi], dim=0)
-        # svg_loss = self.compute_svgd_uniformity(psis)
-
-        # loss = (0.9*latitude_distance+(0.1*svg_loss)).mean()
-
-        # return loss

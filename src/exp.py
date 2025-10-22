@@ -18,6 +18,7 @@ from matplotlib.patches import Ellipse
 from sklearn.decomposition import PCA
 import gc
 import wandb
+from vmf import VMFRegularisation
 
 os.environ["WANDB_MODE"] = "online"
 

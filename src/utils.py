@@ -5,6 +5,55 @@ import torch
 import pytz
 from datetime import datetime, timezone
 import math
+import matplotlib.pyplot as plt
+
+
+def get_long_angle(mu):
+
+    return np.arctan2(mu[-1], mu[-1])
+
+
+def visualize_angles(mu_q, mu_p, mu_t1, mu_t2, fname):
+    angle_q = get_long_angle(mu_q)
+    angle_p = get_long_angle(mu_p)
+    angle_t1 = get_long_angle(mu_t1)
+    angle_t2 = get_long_angle(mu_t2)
+
+    fig, ax = plt.subplots(figsize=(8, 8), subplot_kw={'projection': 'polar'})
+
+    points_to_plot = [
+        {'angle': angle_q, 'radius': 1, 'label': 'Query',
+            'color': 'blue', 'marker': '*', 's': 200},
+        {'angle': angle_p, 'radius': 1, 'label': 'Predicted Parent',
+            'color': 'green', 'marker': 'o', 's': 150},
+        {'angle': angle_t1, 'radius': 1, 'label': 'Top Candidate 1',
+            'color': 'red', 'marker': 's', 's': 100},
+        {'angle': angle_t2, 'radius': 1, 'label': 'Top Candidate 2',
+            'color': 'purple', 'marker': 'D', 's': 100}
+    ]
+
+    for point in points_to_plot:
+        if point['label'] == 'Top Candidate 1' and np.isclose(point['angle'], angle_p):
+            point['marker'] = 'x'
+            point['s'] = 200
+            point['label'] = 'Top Candidate 1 (Predicted)'
+
+        ax.scatter(point['angle'], point['radius'], c=point['color'],
+                   marker=point['marker'], s=point['s'], label=point['label'], zorder=5)
+
+        ax.set_title('Polar Coordinates Visualisation', fontsize=16, pad=20)
+
+        ax.set_yticklabels([])
+
+        ax.set_rlim(0, 1.3)
+
+        ax.grid(True, zorder=0)
+
+        ax.legend(loc='upper right', bbox_to_anchor=(1.3, 1.1))
+
+        plt.savefig(fname, bbox_inches='tight', dpi=150)
+        plt.close(fig)
+        print(f"Visualization saved to {fname}")
 
 
 def bert_embedding_to_spherical(e):

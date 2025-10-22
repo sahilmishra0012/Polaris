@@ -31,7 +31,7 @@ parser.add_argument('--padmaxlen', type=int, default=30,
                     help='max length of padding')
 parser.add_argument('--matrixsize', type=int, default=768,
                     help="Size of density matrix")
-parser.add_argument('--negsamples', type=int, default=10,
+parser.add_argument('--negsamples', type=int, default=20,
                     help="Number of negative samples per node")
 parser.add_argument('--model', type=str, default='bert',
                     help='Pretained Language Model')
@@ -52,24 +52,18 @@ parser.add_argument('--accumulation_steps', type=int, default=1,
 
 
 # Polar related
-parser.add_argument('--long_weight', type=float, default=0.50,
-                    help='Weight of the longitude distance')
-parser.add_argument('--lat_weight', type=float, default=0.5,
-                    help='Weight of longitude distance')
 parser.add_argument('--beta', type=float, default=0.5,
                     help='Negative sample weight')
-parser.add_argument('--svgd_h', type=float, default=1,
-                    help='SVGD Parameter')
 parser.add_argument('--vmf_margin', type=float,
                     default=1.0, help='Margin for VMF loss')
-parser.add_argument('--kappa', type=float, default=0.0,
-                    help='Concentration Parameter for Von Misces Fisher Distribution. If set to a value greater than 0, kappa will not be model parameter.')
-parser.add_argument('--repulsive_weight', type=float,
-                    default=1.0, help='Weight for negative and child repulsion')
 parser.add_argument('--c', type=float, default=0.5,
                     help='parameter c for welsch loss')
 parser.add_argument('--is_multi_parent', type=bool,
                     default=True, help='If it is a multi parent taxonomy')
+parser.add_argument('--geometric_weight', type=float,
+                    default=0.5, help='Importance of Geometric Loss')
+parser.add_argument('--probabilistic_weight', type=float,
+                    default=0.5, help='Importance of Probabilistic Loss')
 
 # Others
 parser.add_argument('--cuda', type=bool, default=True,

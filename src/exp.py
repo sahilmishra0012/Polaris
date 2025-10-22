@@ -1,4 +1,3 @@
-
 import os
 import time
 import numpy as np
@@ -18,7 +17,7 @@ from matplotlib.patches import Ellipse
 from sklearn.decomposition import PCA
 import gc
 import wandb
-from vmf import VMFRegularisation
+from vmf import vmf_kl_divergence
 
 os.environ["WANDB_MODE"] = "online"
 
@@ -41,7 +40,7 @@ class Experiments(object):
         self.optimizer = self._select_optimizer()
         self._set_device()
         self.exp_setting = "_".join([str(elem) for elem in [self.args.pre_train, self.args.dataset, self.args.expID, self.args.epochs,
-                                    self.args.batch_size, self.args.beta, self.args.embed_size, self.args.kappa]])
+                                    self.args.batch_size, self.args.beta, self.args.embed_size, self.args.geometric_weight, self.args.probabilistic_weight]])
 
         setting = {
             "dataset": self.args.dataset,
@@ -52,10 +51,6 @@ class Experiments(object):
             'c': self.args.c
         }
         print(setting)
-
-        # if self.args.wandb:
-        #     wandb.init(project='gaussian', config=setting, entity='taxo_iitd')
-        #     wandb.run.log_code(".")
 
     def __load_tokenizer__(self):
         if self.args.model == 'bert':
@@ -179,7 +174,7 @@ class Experiments(object):
                       np.mean(time_tracker)*(self.args.epochs-(1+epoch))),
                   )
 
-            if self.args.is_multi_parent is True:
+            if self.args.is_multi_parent is True and self.args.wandb == 1:
                 wandb.log({
                     'train_loss': (train_loss),
                     'hit@1': (test_acc),
@@ -191,7 +186,7 @@ class Experiments(object):
                     'hit@5': (test_metrics["Prec@5"]),
                     'hit@10': (test_metrics["Prec@10"]),
                 })
-            else:
+            elif self.args.is_multi_parent is False and self.args.wandb == 1:
                 wandb.log({
                     'train_loss': (train_loss),
                     'hit@1': (test_acc),
@@ -224,8 +219,10 @@ class Experiments(object):
 
     def predict(self, tag=None, path=None):
         print("Prediction starting.....")
+        store_csv = False
         if tag == "test" and path:
             self.model.load_state_dict(torch.load(path))
+            store_csv = True
 
         self.model.eval()
         with torch.no_grad():
@@ -234,48 +231,45 @@ class Experiments(object):
 
             q_sphere = self.model.child_projection(
                 self.test_set.encode_query)
+            q_k = self.model.vmf_regulariser.kappa_predictor(
+                q_sphere)
+            q_mu = self.model.vmf_regulariser.mu_predictor(
+                q_sphere)
 
-            # q_angles = self.model.to_polar(q_sphere)
-            # q_theta, q_psi = q_angles[:, :-
-            #                           1], q_angles[:, -1].view(q_angles.size(0))
-
-            candidate_thetas = list()
-            candidate_psis = list()
             candidates_sphere = list()
+            candidates_k = list()
+            candidates_mu = list()
             for encode_candidate in self.test_loader:
                 candidate_sphere = self.model.par_projection(
                     encode_candidate)
-                # candidate_angles = self.model.to_polar(candidate_sphere)
-                # candidate_theta, candidate_psi = candidate_angles[:,
-                #                                                   :-1], candidate_angles[:, -1].view(candidate_angles.size(0))
+                candidate_k = self.model.vmf_regulariser.kappa_predictor(
+                    candidate_sphere)
+                candidate_mu = self.model.vmf_regulariser.mu_predictor(
+                    candidate_sphere)
 
                 candidates_sphere.append(candidate_sphere)
-                # candidate_psis.append(candidate_psi)
-                # candidate_thetas.append(candidate_theta)
+                candidates_k.append(candidate_k)
+                candidates_mu.append(candidate_mu)
 
-            # candidates_thetas = torch.cat(candidate_thetas, dim=0)
-            # candidates_psis = torch.cat(candidate_psis, dim=0)
             candidates_sphere = torch.cat(candidates_sphere, dim=0)
+            candidates_k = torch.cat(candidates_k, dim=0)
+            candidates_mu = torch.cat(candidates_mu, dim=0)
 
             num_queries = q_sphere.size(0)
             num_candidates = candidates_sphere.size(0)
 
             for i in tqdm(range(num_queries), desc='Evaluating Queries'):
-                # q_the = q_theta[i].unsqueeze(0).expand(num_candidates, -1)
-                # q_ps = q_psi[i].unsqueeze(0).expand(num_candidates, -1)
+
                 q_sph = q_sphere[i].unsqueeze(0).expand(num_candidates, -1)
+                q_mu = q_mu[i].unsqueeze(0).expand(num_candidates, -1)
+                q_k = q_k[i].unsqueeze(0).expand(num_candidates, -1)
 
-                # distance = q_the*candidates_thetas
-                # lat_distance = self.model.latitude_distance(
-                #     candidates_thetas, q_the)
-                # long_distance = self.model.longitude_distance(
-                #     candidates_psis, q_ps)
+                geometric_score = torch.sum(candidates_sphere*q_sph, dim=1)
+                # probabilistic_score = -torch.sum(vmf_kl_divergence(
+                #     q_mu, q_k, candidates_mu, candidates_k, candidates_mu.size(1)), dim=1)
 
-                # lat_distance = self.model.latitude_distance(
-                #     candidates_psis, q_ps)
-                final_score = torch.sum(candidates_sphere*q_sph, dim=1)
-                # final_score = torch.mean(
-                #     self.args.lat_weight*lat_distance+self.args.long_weight*long_distance, dim=0)
+                # TODO: Figure this combination out.
+                final_score = geometric_score
 
                 score_list.append(final_score)
 

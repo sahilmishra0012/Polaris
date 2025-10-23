@@ -57,7 +57,7 @@ class VMFRegularisation(nn.Module):
         self.mu_predictor = nn.Sequential(SphericalLinear(
             embedding_dim, hidden_dim), SphericalTanh(), SphericalLinear(hidden_dim, embedding_dim))
 
-    def forward(self, p_emb, c_emb, n_emb, margin=1):
+    def forward(self, p_emb, c_emb, n_emb, margin=0.5):
         mu_p, mu_c, mu_n = self.mu_predictor(
             p_emb), self.mu_predictor(c_emb), self.mu_predictor(n_emb)
         kappa_p = self.kappa_predictor(p_emb)

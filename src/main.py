@@ -36,7 +36,7 @@ parser.add_argument('--negsamples', type=int, default=20,
 parser.add_argument('--model', type=str, default='bert',
                     help='Pretained Language Model')
 
-parser.add_argument('--expID', type=int, default=1, help='-th of experiments')
+parser.add_argument('--expID', type=int, default=2, help='-th of experiments')
 parser.add_argument('--epochs', type=int, default=50, help='training epochs')
 parser.add_argument('--batch_size', type=int, default=1024,
                     help='training batch size')
@@ -53,9 +53,9 @@ parser.add_argument('--accumulation_steps', type=int, default=1,
 
 # Polar related
 parser.add_argument('--beta', type=float, default=0.5,
-                    help='Negative sample weight')
+                    help='Negative sample margin')
 parser.add_argument('--vmf_margin', type=float,
-                    default=1.0, help='Margin for VMF loss')
+                    default=0.5, help='Margin for VMF loss')
 parser.add_argument('--c', type=float, default=0.5,
                     help='parameter c for welsch loss')
 parser.add_argument('--is_multi_parent', type=bool,
@@ -89,7 +89,7 @@ def experiment(args):
         wandb.init(
             project='PolarTaxo',
 
-            name=f'{args.dataset}-{args.embed_size}-{args.beta}-{args.kappa}',
+            name=f'{args.dataset}-{args.embed_size}-{args.beta}-{args.geometric_weight}',
             config=args,
 
         )

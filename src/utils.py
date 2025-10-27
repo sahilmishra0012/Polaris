@@ -8,6 +8,31 @@ import math
 import matplotlib.pyplot as plt
 
 
+def cartesian_to_spherical_angles(cartesian_vectors):
+    if cartesian_vectors.shape[1] < 3:
+        raise ValueError(
+            "Input dimension must be at least 3 to compute the required angles.")
+
+    epsilon = 1e-9
+
+    xn = cartesian_vectors[:, -1]
+    xn_minus_1 = cartesian_vectors[:, -2]
+
+    numerator_theta = xn_minus_1 + torch.sqrt(xn**2 + xn_minus_1**2 + epsilon)
+    argument_theta = numerator_theta / (xn + epsilon)
+
+    arccot_val = np.pi / 2 - torch.atan(argument_theta)
+    theta = 2 * arccot_val
+
+    phi1 = torch.acos(torch.clamp(cartesian_vectors[:, 0], -1.0, 1.0))
+
+    denominator_phi2 = torch.sqrt(1.0 - cartesian_vectors[:, 0]**2 + epsilon)
+    argument_phi2 = cartesian_vectors[:, 1] / denominator_phi2
+    phi2 = torch.acos(torch.clamp(argument_phi2, -1.0, 1.0))
+
+    return theta, phi1, phi2
+
+
 def get_long_angle(mu):
 
     return np.arctan2(mu[-1], mu[-1])

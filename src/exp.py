@@ -16,8 +16,10 @@ from optimizer import RiemannianAdam
 from matplotlib.patches import Ellipse
 from sklearn.decomposition import PCA
 import gc
+import seaborn as sns
+import matplotlib.pyplot as plt
+import csv
 import wandb
-from vmf import vmf_kl_divergence
 
 os.environ["WANDB_MODE"] = "online"
 
@@ -199,7 +201,7 @@ class Experiments(object):
                 })
             # Save the checkpoint
             torch.save(self.model.state_dict(
-            ), f"../result/{self.args.dataset}/train/experiment_{self.exp_setting}.")
+            ), f"../result/{self.args.dataset}/train/experiment_{self.exp_setting}.checkpoint")
 
             # torch.save(self.model.state_dict(), os.path.join("../result", self.args.dataset,
             #            "train", "exp_model_"+self.exp_setting+"_"+str(epoch)+".checkpoint"))
@@ -321,3 +323,115 @@ class Experiments(object):
             json.dump(expt_details, f, indent=4)
 
         return test_metrics
+
+    def visualize_angle_distributions(self, tag=None, path=None):
+        print("Prediction starting.....")
+        store_csv = False
+        if tag == "test" and path:
+            self.model.load_state_dict(torch.load(path))
+            store_csv = True
+
+        self.model.eval()
+        with torch.no_grad():
+            q_sphere = self.model.child_projection(
+                self.test_set.encode_query)
+            candidates_sphere = list()
+
+            for encode_candidate in self.test_loader:
+                candidate_sphere = self.model.par_projection(
+                    encode_candidate)
+
+                candidates_sphere.append(candidate_sphere)
+
+            candidates_sphere = torch.cat(candidates_sphere, dim=0)
+            num_queries = q_sphere.size(0)
+
+            if store_csv is True:
+                all_query_thetas, all_query_psi1s, all_query_psi2s = [], [], []
+                all_top1_pred_thetas, all_top1_pred_psi1s, all_top1_pred_psi2s = [], [], []
+
+                with open('angle_distributions.csv', 'w', newline='') as csvfile:
+                    csv_writer = csv.writer(csvfile)
+                    header = [
+                        'query_theta', 'query_psi1', 'query_psi2',
+                        'pred1_theta', 'pred1_psi1', 'pred1_psi2',
+                        'pred2_theta', 'pred2_psi1', 'pred2_psi2',
+                        'pred3_theta', 'pred3_psi1', 'pred3_psi2'
+                    ]
+
+                    csv_writer.writerow(header)
+
+                    for i in tqdm(range(num_queries), desc='Evaluating Queries'):
+                        q_sph = q_sphere[i].unsqueeze(0)
+                        q_sph_expanded = q_sph.expand(
+                            candidates_sphere.shape[0], -1)
+                        geometric_score = torch.sum(
+                            candidates_sphere * q_sph_expanded, dim=1)
+                        final_score = geometric_score
+
+                        _, top_indices = torch.topk(final_score, 3)
+                        top_3_candidates_sph = candidates_sphere[top_indices]
+
+                        q_theta, q_psi1, q_psi2 = cartesian_to_spherical_angles(
+                            q_sph)
+
+                        pred_thetas, pred_psi1s, pred_psi2s = cartesian_to_spherical_angles(
+                            top_3_candidates_sph)
+                        row_data = [
+                            q_theta.item(), q_psi1.item(), q_psi2.item(),
+                            pred_thetas[0].item(), pred_psi1s[0].item(
+                            ), pred_psi2s[0].item(),
+                            pred_thetas[1].item(), pred_psi1s[1].item(
+                            ), pred_psi2s[1].item(),
+                            pred_thetas[2].item(), pred_psi1s[2].item(
+                            ), pred_psi2s[2].item()
+                        ]
+                        csv_writer.writerow(row_data)
+
+                        all_query_thetas.append(q_theta.item())
+                        all_query_psi1s.append(q_psi1.item())
+                        all_query_psi2s.append(q_psi2.item())
+                        all_top1_pred_thetas.append(pred_thetas[0].item())
+                        all_top1_pred_psi1s.append(pred_psi1s[0].item())
+                        all_top1_pred_psi2s.append(pred_psi2s[0].item())
+
+                    print("Generating angle distribution plots...")
+
+                    fig, axes = plt.subplots(2, 3, figsize=(20, 10))
+                    fig.suptitle(
+                        'Distributions of Query vs. Top-1 Predicted Angles', fontsize=20)
+
+                    plot_config = {
+                        'kde': True,
+                        'bins': 50
+                    }
+
+                    sns.histplot(all_query_thetas, ax=axes[0, 0], **plot_config, color='royalblue').set_title(
+                        "Query: Longtiudinal Angle", fontsize=14)
+                    sns.histplot(all_query_psi1s, ax=axes[0, 1], **plot_config, color='royalblue').set_title(
+                        "Query: First Latitudinal Angle", fontsize=14)
+                    sns.histplot(all_query_psi2s, ax=axes[0, 2], **plot_config, color='royalblue').set_title(
+                        "Query: Second Latitudinal Angle", fontsize=14)
+
+                    sns.histplot(all_top1_pred_thetas, ax=axes[1, 0], **plot_config, color='darkorange').set_title(
+                        'Top-1 Pred: Longitudinal Angle (θ)', fontsize=14)
+                    sns.histplot(all_top1_pred_psi1s, ax=axes[1, 1], **plot_config, color='darkorange').set_title(
+                        'Top-1 Pred: 1st Latitudinal Angle (ψ1)', fontsize=14)
+                    sns.histplot(all_top1_pred_psi2s, ax=axes[1, 2], **plot_config, color='darkorange').set_title(
+                        'Top-1 Pred: 2nd Latitudinal Angle (ψ2)', fontsize=14)
+
+                    for i in range(3):
+                        axes[0, i].set_xlabel('Angle (radians)')
+                        axes[1, i].set_xlabel('Angle (radians)')
+                        axes[0, i].set_ylabel('Frequency')
+                        axes[1, i].set_ylabel('Frequency')
+
+                    axes[0, 0].set_xlim(0, 2 * np.pi)
+                    axes[1, 0].set_xlim(0, 2 * np.pi)
+                    axes[0, 1].set_xlim(0, np.pi)
+                    axes[1, 1].set_xlim(0, np.pi)
+                    axes[0, 2].set_xlim(0, np.pi)
+                    axes[1, 2].set_xlim(0, np.pi)
+
+                    plt.tight_layout(rect=[0, 0, 1, 0.96])
+                    plt.savefig("angle_distribution_plots.png")

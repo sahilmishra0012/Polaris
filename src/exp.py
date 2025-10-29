@@ -42,7 +42,7 @@ class Experiments(object):
         self.optimizer = self._select_optimizer()
         self._set_device()
         self.exp_setting = "_".join([str(elem) for elem in [self.args.pre_train, self.args.dataset, self.args.expID, self.args.epochs,
-                                    self.args.batch_size, self.args.beta, self.args.embed_size, self.args.geometric_weight, self.args.probabilistic_weight]])
+                                    self.args.batch_size, self.args.beta, self.args.embed_size, self.args.geometric_weight, self.args.c, self.args.vmf_margin]])
 
         setting = {
             "dataset": self.args.dataset,
@@ -335,12 +335,14 @@ class Experiments(object):
         with torch.no_grad():
             q_sphere = self.model.child_projection(
                 self.test_set.encode_query)
+            q_sphere = self.model.vmf_regulariser.mu_predictor(q_sphere)
             candidates_sphere = list()
 
             for encode_candidate in self.test_loader:
                 candidate_sphere = self.model.par_projection(
                     encode_candidate)
-
+                candidate_sphere = self.model.vmf_regulariser.mu_predictor(
+                    candidate_sphere)
                 candidates_sphere.append(candidate_sphere)
 
             candidates_sphere = torch.cat(candidates_sphere, dim=0)

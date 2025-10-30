@@ -8,29 +8,42 @@ import math
 import matplotlib.pyplot as plt
 
 
-def cartesian_to_spherical_angles(cartesian_vectors):
-    if cartesian_vectors.shape[1] < 3:
+def cartesian_to_spherical_angles(e):
+    _, d = e.shape
+    if d < 3:
         raise ValueError(
             "Input dimension must be at least 3 to compute the required angles.")
 
-    epsilon = 1e-9
+    eps = 1e-8
+    e_norm = e / (torch.norm(e, p=2, dim=1, keepdim=True) + eps)
 
-    xn = cartesian_vectors[:, -1]
-    xn_minus_1 = cartesian_vectors[:, -2]
+    e_sq = e_norm.pow(2)
+    cum_sq_from_back = torch.cumsum(torch.flip(e_sq, dims=[1]), dim=1)
+    cum_sq_from_back = torch.flip(cum_sq_from_back, dims=[1])
 
-    numerator_theta = xn_minus_1 + torch.sqrt(xn**2 + xn_minus_1**2 + epsilon)
-    argument_theta = numerator_theta / (xn + epsilon)
+    numerator1 = e_norm[:, 0]
+    denominator1 = torch.sqrt(cum_sq_from_back[:, 0] + eps)
+    ratio1 = numerator1 / denominator1
+    clamped_ratio1 = torch.clamp(ratio1, -1.0 + eps, 1.0 - eps)
+    psi1 = torch.acos(clamped_ratio1)
 
-    arccot_val = np.pi / 2 - torch.atan(argument_theta)
-    theta = 2 * arccot_val
+    numerator2 = e_norm[:, 1]
+    denominator2 = torch.sqrt(cum_sq_from_back[:, 1] + eps)
+    ratio2 = numerator2 / denominator2
+    clamped_ratio2 = torch.clamp(ratio2, -1.0 + eps, 1.0 - eps)
+    psi2 = torch.acos(clamped_ratio2)
 
-    phi1 = torch.acos(torch.clamp(cartesian_vectors[:, 0], -1.0, 1.0))
+    e_d_minus_1 = e_norm[:, d - 2]
+    e_d = e_norm[:, d - 1]
 
-    denominator_phi2 = torch.sqrt(1.0 - cartesian_vectors[:, 0]**2 + epsilon)
-    argument_phi2 = cartesian_vectors[:, 1] / denominator_phi2
-    phi2 = torch.acos(torch.clamp(argument_phi2, -1.0, 1.0))
+    theta_denom = torch.sqrt(e_d_minus_1**2 + e_d**2 + eps)
+    theta_ratio = e_d_minus_1 / theta_denom
 
-    return theta, phi1, phi2
+    clamped_theta_ratio = torch.clamp(theta_ratio, -1.0 + eps, 1.0 - eps)
+    theta_base = torch.acos(clamped_theta_ratio)
+    theta = torch.where(e_d < 0, 2 * math.pi - theta_base, theta_base)
+
+    return theta, psi1, psi2
 
 
 def get_long_angle(mu):

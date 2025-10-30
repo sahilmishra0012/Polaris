@@ -71,8 +71,6 @@ class Experiments(object):
         if self.args.optim == "adam":
             optimizer = optim.Adam(parameters, lr=self.args.lr)
         elif self.args.optim == "adamw":
-            # optimizer = optim.AdamW(
-            #     parameters, lr=self.args.lr, eps=self.args.eps)
             optimizer = RiemannianAdam(
                 params=parameters, lr=self.args.lr, eps=self.args.eps, betas=(0.9, 0.999))
 
@@ -105,7 +103,6 @@ class Experiments(object):
 
     def train(self, checkpoint=None, save_path=None):
         time_tracker = []
-        # save_path = f"../final_result/{self.args.dataset}/KL_volume_containment_{self.args.expID}_{self.args.method}_{self.args.model}_{self.args.negsamples}.pt"
         test_acc = test_mrr = test_wu_p = 0
         old_test_acc = old_test_mrr = old_test_wu_p = 0
 
@@ -135,24 +132,14 @@ class Experiments(object):
 
                 train_loss.append(loss.item())
 
-            # train_loss = np.average(train_loss)
-            # theta_train_loss = np.average(theta_train_loss)
-            # psi_train_loss = np.average(psi_train_loss)
             train_loss = np.average(train_loss)
             print("Theta Loss: ", theta_train_loss)
             print("Psi Loss: ", psi_train_loss)
             print("Loss: ", train_loss)
 
-            # torch.save(self.model.state_dict(), os.path.join(
-            #     "../result", self.args.dataset, "train", f"KL_volume_containment_{self.args.expID}_{self.args.method}_{self.args.model}_{self.args.negsamples}_{epoch}.checkpoint"))
-            # if epoch >= 1:
-            #     os.remove(os.path.join(
-            #         "../result", self.args.dataset, "train", f"KL_volume_containment_{self.args.expID}_{self.args.method}_{self.args.model}_{self.args.negsamples}_{epoch-1}.checkpoint"))
-
             test_metrics = self.predict()
             test_acc = test_metrics["Prec@1"]
             test_mrr = test_metrics["MRR"]
-            # test_wu_p = test_metrics["Wu"]
             if test_acc >= old_test_acc or test_mrr >= old_test_mrr:
                 torch.save(self.model.state_dict(
                 ), f"../final_result/{self.args.dataset}/experiment_{self.exp_setting}.pt")
@@ -199,15 +186,8 @@ class Experiments(object):
                     'mr': (test_metrics["MR"]),
                     'Wu&P': test_metrics['Wu'],
                 })
-            # Save the checkpoint
             torch.save(self.model.state_dict(
             ), f"../result/{self.args.dataset}/train/experiment_{self.exp_setting}.checkpoint")
-
-            # torch.save(self.model.state_dict(), os.path.join("../result", self.args.dataset,
-            #            "train", "exp_model_"+self.exp_setting+"_"+str(epoch)+".checkpoint"))
-            # if epoch:
-            #     os.remove(os.path.join("../result", self.args.dataset, "train",
-            #               "exp_model_"+self.exp_setting+"_"+str((epoch-1))+".checkpoint"))
 
     def get_pos_from_h_theta(self, h, theta):
 
@@ -267,10 +247,7 @@ class Experiments(object):
                 q_k = q_k[i].unsqueeze(0).expand(num_candidates, -1)
 
                 geometric_score = torch.sum(candidates_sphere*q_sph, dim=1)
-                # probabilistic_score = -torch.sum(vmf_kl_divergence(
-                #     q_mu, q_k, candidates_mu, candidates_k, candidates_mu.size(1)), dim=1)
 
-                # TODO: Figure this combination out.
                 final_score = geometric_score
 
                 score_list.append(final_score)
@@ -333,38 +310,45 @@ class Experiments(object):
 
         self.model.eval()
         with torch.no_grad():
-            q_sphere = self.model.child_projection(
+            q_z = self.model.child_projection(
                 self.test_set.encode_query)
-            q_sphere = self.model.vmf_regulariser.mu_predictor(q_sphere)
+            q_sphere = self.model.vmf_regulariser.mu_predictor(q_z)
+            q_k = self.model.vmf_regulariser.kappa_predictor(q_z)
             candidates_sphere = list()
+            candidates_k = list()
 
             for encode_candidate in self.test_loader:
-                candidate_sphere = self.model.par_projection(
+                candidate_z = self.model.par_projection(
                     encode_candidate)
                 candidate_sphere = self.model.vmf_regulariser.mu_predictor(
-                    candidate_sphere)
+                    candidate_z)
+                candidate_k = self.model.vmf_regulariser.kappa_predictor(
+                    candidate_z)
                 candidates_sphere.append(candidate_sphere)
+                candidates_k.append(candidate_k)
 
             candidates_sphere = torch.cat(candidates_sphere, dim=0)
+            candidates_k = torch.cat(candidates_k, dim=0)
             num_queries = q_sphere.size(0)
 
             if store_csv is True:
-                all_query_thetas, all_query_psi1s, all_query_psi2s = [], [], []
-                all_top1_pred_thetas, all_top1_pred_psi1s, all_top1_pred_psi2s = [], [], []
+                all_query_thetas, all_query_psi1s, all_query_psi2s, all_query_ks = [], [], [], []
+                all_top1_pred_thetas, all_top1_pred_psi1s, all_top1_pred_psi2s, all_top1_pred_ks = [], [], [], []
 
                 with open('angle_distributions.csv', 'w', newline='') as csvfile:
                     csv_writer = csv.writer(csvfile)
                     header = [
-                        'query_theta', 'query_psi1', 'query_psi2',
-                        'pred1_theta', 'pred1_psi1', 'pred1_psi2',
-                        'pred2_theta', 'pred2_psi1', 'pred2_psi2',
-                        'pred3_theta', 'pred3_psi1', 'pred3_psi2'
+                        'query_theta', 'query_psi1', 'query_psi2', 'query_k',
+                        'pred1_theta', 'pred1_psi1', 'pred1_psi2', 'pred1_k',
+                        'pred2_theta', 'pred2_psi1', 'pred2_psi2', 'pred2_k',
+                        'pred3_theta', 'pred3_psi1', 'pred3_psi2', 'pred3_k'
                     ]
-
                     csv_writer.writerow(header)
 
                     for i in tqdm(range(num_queries), desc='Evaluating Queries'):
                         q_sph = q_sphere[i].unsqueeze(0)
+                        q_k_val = q_k[i]
+
                         q_sph_expanded = q_sph.expand(
                             candidates_sphere.shape[0], -1)
                         geometric_score = torch.sum(
@@ -373,47 +357,49 @@ class Experiments(object):
 
                         _, top_indices = torch.topk(final_score, 3)
                         top_3_candidates_sph = candidates_sphere[top_indices]
+                        top_3_candidates_k = candidates_k[top_indices]
 
                         q_theta, q_psi1, q_psi2 = cartesian_to_spherical_angles(
                             q_sph)
-
                         pred_thetas, pred_psi1s, pred_psi2s = cartesian_to_spherical_angles(
                             top_3_candidates_sph)
+
                         row_data = [
-                            q_theta.item(), q_psi1.item(), q_psi2.item(),
+                            q_theta.item(), q_psi1.item(), q_psi2.item(), q_k_val.item(),
                             pred_thetas[0].item(), pred_psi1s[0].item(
-                            ), pred_psi2s[0].item(),
+                            ), pred_psi2s[0].item(), top_3_candidates_k[0].item(),
                             pred_thetas[1].item(), pred_psi1s[1].item(
-                            ), pred_psi2s[1].item(),
+                            ), pred_psi2s[1].item(), top_3_candidates_k[1].item(),
                             pred_thetas[2].item(), pred_psi1s[2].item(
-                            ), pred_psi2s[2].item()
+                            ), pred_psi2s[2].item(), top_3_candidates_k[2].item()
                         ]
                         csv_writer.writerow(row_data)
 
                         all_query_thetas.append(q_theta.item())
                         all_query_psi1s.append(q_psi1.item())
                         all_query_psi2s.append(q_psi2.item())
+                        all_query_ks.append(q_k_val.item())
+
                         all_top1_pred_thetas.append(pred_thetas[0].item())
                         all_top1_pred_psi1s.append(pred_psi1s[0].item())
                         all_top1_pred_psi2s.append(pred_psi2s[0].item())
+                        all_top1_pred_ks.append(top_3_candidates_k[0].item())
 
-                    print("Generating angle distribution plots...")
+                if num_queries > 0:
+                    print("Generating angle and k-value distribution plots...")
 
-                    fig, axes = plt.subplots(2, 3, figsize=(20, 10))
+                    fig, axes = plt.subplots(2, 4, figsize=(26, 10))
                     fig.suptitle(
-                        'Distributions of Query vs. Top-1 Predicted Angles', fontsize=20)
+                        'Distributions of Query vs. Top-1 Predicted Angles and K-Values', fontsize=20)
 
-                    plot_config = {
-                        'kde': True,
-                        'bins': 50
-                    }
+                    plot_config = {'kde': True, 'bins': 50}
 
                     sns.histplot(all_query_thetas, ax=axes[0, 0], **plot_config, color='royalblue').set_title(
-                        "Query: Longtiudinal Angle", fontsize=14)
+                        "Query: Longitudinal Angle (θ)", fontsize=14)
                     sns.histplot(all_query_psi1s, ax=axes[0, 1], **plot_config, color='royalblue').set_title(
-                        "Query: First Latitudinal Angle", fontsize=14)
+                        "Query: 1st Latitudinal Angle (ψ1)", fontsize=14)
                     sns.histplot(all_query_psi2s, ax=axes[0, 2], **plot_config, color='royalblue').set_title(
-                        "Query: Second Latitudinal Angle", fontsize=14)
+                        "Query: 2nd Latitudinal Angle (ψ2)", fontsize=14)
 
                     sns.histplot(all_top1_pred_thetas, ax=axes[1, 0], **plot_config, color='darkorange').set_title(
                         'Top-1 Pred: Longitudinal Angle (θ)', fontsize=14)
@@ -422,11 +408,20 @@ class Experiments(object):
                     sns.histplot(all_top1_pred_psi2s, ax=axes[1, 2], **plot_config, color='darkorange').set_title(
                         'Top-1 Pred: 2nd Latitudinal Angle (ψ2)', fontsize=14)
 
-                    for i in range(3):
-                        axes[0, i].set_xlabel('Angle (radians)')
-                        axes[1, i].set_xlabel('Angle (radians)')
+                    sns.histplot(all_query_ks, ax=axes[0, 3], **plot_config, color='green').set_title(
+                        "Query: K-Value Distribution", fontsize=14)
+                    sns.histplot(all_top1_pred_ks, ax=axes[1, 3], **plot_config, color='purple').set_title(
+                        "Top-1 Pred: K-Value Distribution", fontsize=14)
+
+                    for i in range(4):
                         axes[0, i].set_ylabel('Frequency')
                         axes[1, i].set_ylabel('Frequency')
+                        if i < 3:
+                            axes[0, i].set_xlabel('Angle (radians)')
+                            axes[1, i].set_xlabel('Angle (radians)')
+                        else:
+                            axes[0, i].set_xlabel('K Value')
+                            axes[1, i].set_xlabel('K Value')
 
                     axes[0, 0].set_xlim(0, 2 * np.pi)
                     axes[1, 0].set_xlim(0, 2 * np.pi)
@@ -436,4 +431,7 @@ class Experiments(object):
                     axes[1, 2].set_xlim(0, np.pi)
 
                     plt.tight_layout(rect=[0, 0, 1, 0.96])
-                    plt.savefig("angle_distribution_plots.png")
+                    plt.savefig("angle_and_k_distribution_plots.png")
+                    plt.show()
+
+                    print("Plots saved to angle_and_k_distribution_plots.png")

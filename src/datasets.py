@@ -457,5 +457,5 @@ class MAGDataset(object):
 
 
 if __name__ == '__main__':
-    MAGDataset(name='wordnet_verb', path="../data/wordnet_verb",
+    MAGDataset(name='psychology', path="../data/psychology",
                existing_partition=False, partition_pattern='leaf')

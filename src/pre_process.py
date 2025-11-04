@@ -1,4 +1,3 @@
-
 import os
 import json
 import pickle as pkl
@@ -220,10 +219,6 @@ def pre_process_mag(args, outID=True):
 
     print(f"Loaded {len(concept_set)} total concepts.")
 
-    # train_taxonomy_terms_file = os.path.join(
-    #     f"../data/{dataset}/{dataset}.terms.train")
-    # train_taxonomy_terms = load_file(train_taxonomy_terms_file)
-
     train_taxnomy_file = os.path.join(
         f"../data/{dataset}/{dataset}_train.taxo")
     train_taxonomy_pairs = load_file(train_taxnomy_file)
@@ -250,8 +245,32 @@ def pre_process_mag(args, outID=True):
         taxo_edges.append((parent, child))
 
     all_children = set(child_list)
-    roots = train_concept_set-all_children
+    roots = train_concept_set - all_children
     print(f"Found {len(taxo_edges)} training edges....")
+    print(f"Found {len(roots)} root nodes in the training taxonomy.")
+
+    print("Calculating node levels...")
+    node_levels = {}
+    queue = deque()
+    visited_for_levels = set()
+
+    for root in roots:
+        if root not in visited_for_levels:
+            node_levels[root] = 1
+            queue.append(root)
+            visited_for_levels.add(root)
+
+    while queue:
+        current_node = queue.popleft()
+        current_level = node_levels[current_node]
+
+        if current_node in taxo_dict:
+            for child in taxo_dict[current_node]:
+                if child not in visited_for_levels:
+                    visited_for_levels.add(child)
+                    node_levels[child] = current_level + 1
+                    queue.append(child)
+    print("Node level calculation complete.")
 
     if args.dataset == 'computer_science':
         supernode = concept_id['computer science']
@@ -270,16 +289,12 @@ def pre_process_mag(args, outID=True):
             id_context[cid] = f"{concept_lower}: {def_dic[concept_lower]}"
         else:
             id_context[cid] = f"{concept_lower}: {concept_lower}"
-
             definitions_not_found_count += 1
 
     test_terms_file = os.path.join(
         f"../data/{dataset}/{dataset}_test.terms")
-    # val_terms_file = os.path.join(
-    #     f"../data/{dataset}/{dataset}_validation.terms")
 
     test_term_lines = load_file(test_terms_file)
-    # val_term_lines = load_file(val_terms_file)
     with open(f"../data/{args.dataset}/test_taxo.json") as f:
         test_map = json.load(f)
 
@@ -287,16 +302,16 @@ def pre_process_mag(args, outID=True):
 
     def get_eval_data(lines):
         concept_ids, gts_ids = [], []
-        q = 0
         for line in lines:
             _, child_term = line.strip().split("\t")
             parent_ids = list()
-            if child_term in list(concept_id.keys()):
+            if child_term in concept_id:
                 child_id = concept_id[child_term]
-                parent_terms = test_map[child_term]
+                parent_terms = test_map.get(child_term, [])
 
                 for p in parent_terms:
-                    parent_ids.append(concept_id[p])
+                    if p in concept_id:
+                        parent_ids.append(concept_id[p])
 
                 concept_ids.append(child_id)
                 gts_ids.append(parent_ids)
@@ -309,69 +324,18 @@ def pre_process_mag(args, outID=True):
     val_concepts_ids, val_gts_ids = [], []
     test_concepts_ids, test_gts_ids = get_eval_data(test_term_lines)
 
-    sampled_negative_parent_dict = {}
-    negative_parent_list = []
-
     child_parent_pair = [[child, parent]
                          for child, parent in zip(child_list, parent_list)]
 
-    # term_id_map = {}
-    # for k, v in id_term_map.items():
-    #     if v not in term_id_map:
-    #         term_id_map[v] = k
-
-    # c_p_terms = list()
-    # for child, parent in child_parent_pair:
-    #     child_term = id_term_map[id_concept[child]]
-    #     parent_term = id_term_map[id_concept[parent]]
-
-    #     c_p_terms.append([child_term, parent_term])
-
-    # # Filter only unique ones
-
-    # seen_doubles = set()
-    # filtered_list = list()
-    # for double in c_p_terms:
-    #     current_double = double
-
-    #     if tuple(current_double) not in seen_doubles:
-    #         filtered_list.append(current_double)
-    #         seen_doubles.add(tuple(current_double))
-
-    # child_parent_pair = list()
-    # for child, parent in filtered_list:
-    #     c_id = concept_id[term_id_map[child]]
-    #     p_id = concept_id[term_id_map[parent]]
-
-    #     child_parent_pair.append([c_id, p_id])
-
-    # unique_child_list = sorted(list(set(child_list)))
-    # for cid in tqdm(unique_child_list, desc="Generating Negatives"):
-    #     true_parents = all_taxo_dict_reverse[cid]
-    #     candidate_pool = [
-    #         pid for pid in list(train_concept_set) if pid != cid and pid not in true_parents]
-
-    #     num_to_sample = min(negsamples, len(candidate_pool))
-    #     if num_to_sample > 0:
-    #         neg_parents = np.random.choice(
-    #             candidate_pool, num_to_sample, replace=False).tolist()
-    #     else:
-    #         neg_parents = []
-
-    #     sampled_negative_parent_dict[cid] = neg_parents
-    #     negative_parent_list.extend(neg_parents)
     count_hard_neg_samples = 0
     count_fallback_samples = 0
-
     training_triplets = list()
-    count_skipped = 0
     print(
         f"Definitions for {definitions_not_found_count} concepts not found in the wiki dictionary.")
-    print(f"There are {len(child_parent_pair)} in the training set ")
+    print(f"There are {len(child_parent_pair)} pairs in the training set.")
     for child_id, parent_id in tqdm(child_parent_pair, desc="Generating (c, p, n) Triplets"):
 
         found_negatives = []
-
         hard_candidate_pool = set()
 
         siblings = set(all_taxo_dict.get(parent_id, []))
@@ -383,7 +347,7 @@ def pre_process_mag(args, outID=True):
 
         filtered_hard_candidates = [
             node for node in hard_candidate_pool
-            if node in train_concept_set and node != 'root'
+            if node in train_concept_set
         ]
 
         num_hard_to_sample = min(negsamples, len(filtered_hard_candidates))
@@ -402,9 +366,8 @@ def pre_process_mag(args, outID=True):
 
             if (random_negative != child_id and
                 random_negative != parent_id and
-                random_negative != 'root' and
+                random_negative not in chd2par_dict[child_id] and
                     random_negative not in found_negatives):
-
                 found_negatives.append(random_negative)
                 count_fallback_samples += 1
 
@@ -413,42 +376,25 @@ def pre_process_mag(args, outID=True):
 
     print("Negative sampling done.")
     print(
-        f"Skipped for {count_fallback_samples} triplets since no hard negative was found. Using fallback option.")
-
-    child_neg_parent_pair = []
+        f"Generated {count_hard_neg_samples} hard negative samples.")
+    print(
+        f"Used fallback random sampling for {count_fallback_samples} samples.")
 
     child_parent_negative_parent_triple = training_triplets
-    # child_parent_negative_parent_triple = list()
-    # for c, p in child_parent_pair:
-    #     for neg in sampled_negative_parent_dict[c]:
-    #         child_parent_negative_parent_triple.append([c, p, neg])
     print(
-        f"There are {len(child_parent_negative_parent_triple)} samples for training")
-
+        f"There are {len(child_parent_negative_parent_triple)} samples for training.")
     print(
-        f"There are {len(test_concepts_ids)} test concepts with {len(test_gts_ids)} grount truth mappings")
+        f"There are {len(test_concepts_ids)} test concepts with {len(test_gts_ids)} ground truth mappings.")
 
     path2root = collections.defaultdict(list)
-
-    # print("Finding path to roots for all nodes and storing..")
-    # for node in train_concept_set:
-    #     current = node
-    #     lev = 0
-    #     while current != supernode:
-    #         path2root[node].append(current)
-    #         current = list(chd2par_dict[current])[0]
-    #         lev += 1
-
-    #     print(lev)
-    #     path2root[node].append(supernode)
-
     print("Preprocessing complete.")
 
     return (
         concept_set, concept_id, id_concept, id_context, train_concept_set, taxo_dict,
-        sampled_negative_parent_dict, child_parent_negative_parent_triple, parent_list, child_list,
-        negative_parent_list, all_taxo_dict, path2root, child_parent_pair,
-        child_neg_parent_pair, val_concepts_ids, val_gts_ids, test_concepts_ids, test_gts_ids
+        child_parent_negative_parent_triple, parent_list, child_list,
+        all_taxo_dict, path2root, child_parent_pair,
+        val_concepts_ids, val_gts_ids, test_concepts_ids, test_gts_ids,
+        node_levels
     )
 
 
@@ -647,7 +593,7 @@ def create_mag_data(args):
 
     print("Waiting for preprocess data....")
 
-    concept_set, concept_id, id_concept, id_context, train_concept_set, taxo_dict, negative_parent_dict, child_parent_negative_parent_triple, parent_list, child_list, negative_parent_list, all_taxo_dict, path2root, child_parent_pair, child_neg_parent_pair, val_concept, val_gt, test_concepts_id, test_gt = pre_process_mag(
+    concept_set, concept_id, id_concept, id_context, train_concept_set, taxo_dict, negative_parent_dict, child_parent_negative_parent_triple, parent_list, child_list, negative_parent_list, all_taxo_dict, path2root, child_parent_pair, child_neg_parent_pair, val_concept, val_gt, test_concepts_id, test_gt, node_levels = pre_process_mag(
         args)
     save_data = {
         "concept_set": concept_set,
@@ -670,7 +616,8 @@ def create_mag_data(args):
         "val_concept": val_concept,
         "val_gt": val_gt,
         "test_concept": test_concepts_id,
-        "test_gt": test_gt
+        "test_gt": test_gt,
+        "node_levels": node_levels
     }
 
     with open("../data/"+str(args.dataset)+"/processed/taxonomy_data_"+str(args.expID)+str(args.negsamples)+"_.pkl", "wb") as f:
@@ -733,10 +680,5 @@ def create_data(args, maxlimit=None):
 
 
 if __name__ == '__main__':
-    # analyze_parent_child_relationships(
-    #     "../data/computer_science/computer_science.taxo")
-    # terms_to_json("../data/wordnet_verb/wordnet_verb.desc")
     create_child_to_parents_map(
-        "../data/wordnet_verb/wordnet_verb.taxo", "wordnet_verb")
-    # terms_to_json("../data/wordnet_verb/wordnet_verb.desc", "wordnet_verb")
-    # id_to_json("../data/semeval_food/semeval_food.terms", "semeval_food")
+        "../data/psychology/psychology.taxo", "psychology")

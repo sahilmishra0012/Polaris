@@ -301,6 +301,120 @@ class Experiments(object):
 
         return test_metrics
 
+    def level_wise_prediction(self, tag=None, path=None):
+        print("Prediction starting....")
+        store_csv = False
+
+        if tag == 'test' and path:
+            self.model.load_state_dict(torch.load(path))
+            store_csv = True
+
+        self.model.eval()
+        with torch.no_grad():
+            score_list = list()
+
+            gt_label = self.test_set.test_gt_id
+            q_z = self.model.child_projection(self.test_set.encode_query)
+            q_sphere = self.model.vmf_regulariser.mu_predictor(q_z)
+            q_k = self.model.vmf_regulariser.kappa_predictor(q_z)
+
+            candidates_sphere = list()
+            candidates_mu = list()
+            candidates_k = list()
+
+            candidate_list = self.test_set.true_concept_set
+            for encode_candidate in self.test_loader:
+                candidate_z = self.model.par_projection(encode_candidate)
+                candidate_mu = self.model.vmf_regulariser.mu_predictor(
+                    candidate_z)
+                candidate_k = self.model.vmf_regulariser.kappa_predictor(
+                    candidate_z)
+
+                candidates_sphere.append(candidate_z)
+                candidates_k.append(candidate_k)
+                candidates_mu.append(candidate_mu)
+
+            candidates_mu = torch.cat(candidates_mu, dim=0)
+            candidates_sphere = torch.cat(candidates_sphere, dim=0)
+            candidates_k = torch.cat(candidates_k, dim=0)
+
+            num_queries = q_sphere.size(0)
+            num_candidates = candidates_k.size(0)
+
+            for i in tqdm(range(num_queries), desc='evaluating queries'):
+                q_sph = q_sphere[i].unsqueeze(0).expand(num_candidates, -1)
+                q_mu = q_mu[i].unsqueeze(0).expand(num_candidates, -1)
+                q_k = q_k[i].unsqueeze(0).expand(num_candidates, -1)
+
+                angular_score = torch.sum(candidates_sphere*q_sph, dim=1)
+                # Now, we compute the radius of the predicted and ground truth concept. the radius needs to be big but not very big.
+
+                candidates_radii = list()
+                for c in range(num_candidates):
+                    candidate_id = candidate_list[c]
+                    candidate_node_level = self.test_set.levels[candidate_id]
+                    candidate_radii = torch.exp(-0.5 *
+                                                torch.tensor(candidate_node_level))
+                    candidates_radii.append(candidate_radii)
+                candidates_radii = torch.tensor(candidates_radii)
+                query_radius = torch.sum(angular_score*candidates_radii)
+
+                # Now compute the radius score
+                radius_diff = candidates_radii-query_radius
+                radius_score = 0.5+0.5*torch.sigmoid(radius_diff)
+
+                final_score = radius_score*angular_score
+                score_list.append(final_score)
+
+            score_matrix = torch.stack(score_list, dim=0)
+            print("Score matrix size:", score_matrix.size())
+            sorted_scores, indices = score_matrix.sort(dim=1, descending=True)
+            print(sorted_scores[:, :5])
+
+            if self.args.is_multi_parent is True:
+                candidate_list = np.array(list(self.test_set.true_concept_set))
+                test_metrics = metrics_multi_p(
+                    indices, gt_label, candidate_list, self.test_set.id_concept, self.test_set.test_concepts_id)
+
+                print('Hit@1:{:.05f}'.format(test_metrics["Prec@1"]),
+                      'mrr:{:.05f}'.format(test_metrics["MRR"]),
+                      'Recall@1:{:.05f}'.format(test_metrics["Recall@1"]),
+                      'mr:{:.05f}'.format(test_metrics["MR"]),
+                      'Hit@5:{:.05f}'.format(test_metrics["Prec@5"]),
+                      'Hit@10:{:.05f}'.format(test_metrics["Prec@10"]),
+                      'Recall@5:{:.05f}'.format(test_metrics["Recall@5"]),
+                      'Recall@10: {:.05f}'.format(test_metrics["Recall@10"]))
+            else:
+                test_metrics = metrics(
+                    indices,
+                    gt_label,
+                    self.train_set.train_concept_set,
+                    self.test_set.path2root,
+                    self.test_set.id_concept,
+                    self.train_set.id_concept,
+                    self.test_set.test_concepts_id,
+                    sorted_scores
+                )
+
+                print('Hit@1:{:.05f}'.format(test_metrics["Prec@1"]),
+                      'mrr:{:.05f}'.format(test_metrics["MRR"]),
+                      'Recall@1:{:.05f}'.format(test_metrics["Recall@1"]),
+                      'mr:{:.05f}'.format(test_metrics["MR"]),
+                      'prec@5:{:.05f}'.format(test_metrics["Prec@5"]),
+                      'prec@10:{:.05f}'.format(test_metrics["Prec@10"]),
+                      'Recall@5:{:.05f}'.format(test_metrics["Recall@5"]),
+                      'Recall@10: {:.05f}'.format(test_metrics["Recall@10"]))
+
+        with open(f'../results/{self.args.dataset}/res_{self.exp_setting}.json', 'a+') as f:
+            d = vars(self.args)
+            expt_details = {
+                "Arguments": d,
+                "Test Metrics": test_metrics,
+            }
+            json.dump(expt_details, f, indent=4)
+
+        return test_metrics
+
     def visualize_angle_distributions(self, tag=None, path=None):
         print("Prediction starting.....")
         store_csv = False

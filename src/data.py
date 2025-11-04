@@ -183,6 +183,7 @@ class Data_TEST_MAG(Dataset):
         self.test_gt_id = self.data["test_gt_id"]
         self.true_concept_set = list(
             self.concept_set-set(self.test_concepts_id))
+        self.levels = self.data['node_levels']
 
         self.encode_all = self.generate_all_token_ids(self.tokenizer)
         # self.encode_all_paths = self.generate_all_token_ids_paths(self.tokenizer)

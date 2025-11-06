@@ -36,9 +36,9 @@ parser.add_argument('--negsamples', type=int, default=20,
 parser.add_argument('--model', type=str, default='bert',
                     help='Pretained Language Model')
 
-parser.add_argument('--expID', type=int, default=2, help='-th of experiments')
-parser.add_argument('--epochs', type=int, default=50, help='training epochs')
-parser.add_argument('--batch_size', type=int, default=1024,
+parser.add_argument('--expID', type=int, default=5, help='-th of experiments')
+parser.add_argument('--epochs', type=int, default=55, help='training epochs')
+parser.add_argument('--batch_size', type=int, default=512,
                     help='training batch size')
 parser.add_argument('--lr', type=float, default=9e-5,
                     help='learning rate for pre-trained model')
@@ -47,7 +47,7 @@ parser.add_argument('--lr_proj', type=float, default=1e-3,
 parser.add_argument('--eps', type=float, default=1e-8, help='adamw_epsilon')
 parser.add_argument('--optim', type=str, default="adamw", help='Optimizer')
 parser.add_argument('--embed_size', type=int, default=8, help='Embedding Size')
-parser.add_argument('--accumulation_steps', type=int, default=1,
+parser.add_argument('--accumulation_steps', type=int, default=5,
                     help='Increase accumulation steps to use Gradient Accumulation')
 
 
@@ -73,6 +73,10 @@ parser.add_argument('--seed', type=int, default=20,
                     help="seed for random generators")
 parser.add_argument('--method', type=str, default='normal',
                     help='Experiment method conducted')
+parser.add_argument('--resume', type=str, default='no', help='Resume a run')
+parser.add_argument('--run_id', type=str, default='',
+                    help='Wandb run id for resumption')
+parser.add_argument('--entity', type=str, default='uaena', help='wandb entity')
 
 start_time = time.time()
 print("Start time at : ")
@@ -85,13 +89,21 @@ def experiment(args):
     torch.set_float32_matmul_precision('high')
     args.cuda = torch.cuda.is_available() and args.cuda == True
 
-    if args.wandb == 1:
+    if args.wandb == 1 and args.resume == 'no':
         wandb.init(
             project='PolarTaxo',
 
             name=f'{args.dataset}-{args.embed_size}-{args.beta}-{args.geometric_weight}',
             config=args,
 
+        )
+
+    if args.resume == 'must':
+        run = wandb.init(
+            entity=args.entity,
+            project='PolarTaxo',
+            id=args.run_id,
+            resume='must'
         )
 
     if args.cuda:
@@ -126,4 +138,10 @@ def experiment(args):
 
 
 if __name__ == '__main__':
+    args.gpu_id = 2
+    args.expID = 3
+    if args.dataset == 'wordnet_verb':
+        args.epochs = 35
+    else:
+        args.epochs = 55
     experiment(args)

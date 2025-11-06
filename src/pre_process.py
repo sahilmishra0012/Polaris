@@ -205,11 +205,14 @@ def pre_process_mag(args, outID=True):
 
     all_taxo_dict = collections.defaultdict(list)
     all_taxo_dict_reverse = collections.defaultdict(list)
+
+    all_kids = list()
     if outID:
         concept_set = set(concept_id.values())
         for parent_str, children_str in all_taxo_dict_str.items():
             parent_id = concept_id[parent_str]
             children_ids = [concept_id[c] for c in children_str]
+            all_kids.extend(children_ids)
             all_taxo_dict[parent_id].extend(children_ids)
             for child_id in children_ids:
                 all_taxo_dict_reverse[child_id].append(parent_id)
@@ -244,8 +247,8 @@ def pre_process_mag(args, outID=True):
         taxo_dict[parent].append(child)
         taxo_edges.append((parent, child))
 
-    all_children = set(child_list)
-    roots = train_concept_set - all_children
+    all_children = set(all_kids)
+    roots = concept_set - all_children
     print(f"Found {len(taxo_edges)} training edges....")
     print(f"Found {len(roots)} root nodes in the training taxonomy.")
 
@@ -264,8 +267,8 @@ def pre_process_mag(args, outID=True):
         current_node = queue.popleft()
         current_level = node_levels[current_node]
 
-        if current_node in taxo_dict:
-            for child in taxo_dict[current_node]:
+        if current_node in all_taxo_dict:
+            for child in all_taxo_dict[current_node]:
                 if child not in visited_for_levels:
                     visited_for_levels.add(child)
                     node_levels[child] = current_level + 1
@@ -324,6 +327,9 @@ def pre_process_mag(args, outID=True):
     val_concepts_ids, val_gts_ids = [], []
     test_concepts_ids, test_gts_ids = get_eval_data(test_term_lines)
 
+    sampled_negative_parent_dict = {}
+    negative_parent_list = []
+
     child_parent_pair = [[child, parent]
                          for child, parent in zip(child_list, parent_list)]
 
@@ -374,6 +380,7 @@ def pre_process_mag(args, outID=True):
         for neg_id in found_negatives:
             training_triplets.append((child_id, parent_id, neg_id))
 
+    child_neg_parent_pair = []
     print("Negative sampling done.")
     print(
         f"Generated {count_hard_neg_samples} hard negative samples.")
@@ -389,12 +396,14 @@ def pre_process_mag(args, outID=True):
     path2root = collections.defaultdict(list)
     print("Preprocessing complete.")
 
+    with open(f'../levels/{args.dataset}_levels.json', 'w') as f:
+        json.dump(node_levels, f, indent=4)
+
     return (
         concept_set, concept_id, id_concept, id_context, train_concept_set, taxo_dict,
-        child_parent_negative_parent_triple, parent_list, child_list,
-        all_taxo_dict, path2root, child_parent_pair,
-        val_concepts_ids, val_gts_ids, test_concepts_ids, test_gts_ids,
-        node_levels
+        sampled_negative_parent_dict, child_parent_negative_parent_triple, parent_list, child_list,
+        negative_parent_list, all_taxo_dict, path2root, child_parent_pair,
+        child_neg_parent_pair, val_concepts_ids, val_gts_ids, test_concepts_ids, test_gts_ids, node_levels
     )
 
 

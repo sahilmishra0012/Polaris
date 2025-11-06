@@ -137,7 +137,7 @@ class Experiments(object):
             print("Psi Loss: ", psi_train_loss)
             print("Loss: ", train_loss)
 
-            test_metrics = self.predict()
+            test_metrics = self.level_wise_prediction()
             test_acc = test_metrics["Prec@1"]
             test_mrr = test_metrics["MRR"]
             if test_acc >= old_test_acc or test_mrr >= old_test_mrr:
@@ -315,14 +315,15 @@ class Experiments(object):
 
             gt_label = self.test_set.test_gt_id
             q_z = self.model.child_projection(self.test_set.encode_query)
-            q_sphere = self.model.vmf_regulariser.mu_predictor(q_z)
+            q_mu = self.model.vmf_regulariser.mu_predictor(q_z)
             q_k = self.model.vmf_regulariser.kappa_predictor(q_z)
 
             candidates_sphere = list()
             candidates_mu = list()
             candidates_k = list()
 
-            candidate_list = self.test_set.true_concept_set
+            candidate_list = np.array(
+                sorted(list(self.test_set.true_concept_set)))
             for encode_candidate in self.test_loader:
                 candidate_z = self.model.par_projection(encode_candidate)
                 candidate_mu = self.model.vmf_regulariser.mu_predictor(
@@ -338,25 +339,27 @@ class Experiments(object):
             candidates_sphere = torch.cat(candidates_sphere, dim=0)
             candidates_k = torch.cat(candidates_k, dim=0)
 
-            num_queries = q_sphere.size(0)
+            num_queries = q_z.size(0)
             num_candidates = candidates_k.size(0)
 
             for i in tqdm(range(num_queries), desc='evaluating queries'):
-                q_sph = q_sphere[i].unsqueeze(0).expand(num_candidates, -1)
+                q_sph = q_z[i].unsqueeze(0).expand(num_candidates, -1)
                 q_mu = q_mu[i].unsqueeze(0).expand(num_candidates, -1)
                 q_k = q_k[i].unsqueeze(0).expand(num_candidates, -1)
 
                 angular_score = torch.sum(candidates_sphere*q_sph, dim=1)
-                # Now, we compute the radius of the predicted and ground truth concept. the radius needs to be big but not very big.
+                # Now, we compute the radius of the predicted and ground truth con                                                                                          cept. the radius needs to be big but not very big.
 
                 candidates_radii = list()
                 for c in range(num_candidates):
+
                     candidate_id = candidate_list[c]
                     candidate_node_level = self.test_set.levels[candidate_id]
                     candidate_radii = torch.exp(-0.5 *
                                                 torch.tensor(candidate_node_level))
                     candidates_radii.append(candidate_radii)
-                candidates_radii = torch.tensor(candidates_radii)
+                candidates_radii = torch.tensor(
+                    candidates_radii).to(device=angular_score.device)
                 query_radius = torch.sum(angular_score*candidates_radii)
 
                 # Now compute the radius score

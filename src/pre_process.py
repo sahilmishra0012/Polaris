@@ -252,28 +252,66 @@ def pre_process_mag(args, outID=True):
     print(f"Found {len(taxo_edges)} training edges....")
     print(f"Found {len(roots)} root nodes in the training taxonomy.")
 
-    print("Calculating node levels...")
-    node_levels = {}
-    queue = deque()
-    visited_for_levels = set()
+    print("Calculating radii based on depth and descendants using single-step normalization...")
+
+    all_children_nodes = {child for parent,
+                          children in all_taxo_dict.items() for child in children}
+    roots = concept_set - all_children_nodes
+    print(f"Found {len(roots)} root nodes for depth calculation.")
+
+    depths = {}
+    queue = deque([(root, 1) for root in roots])
+    visited_for_depth = set(roots)
 
     for root in roots:
-        if root not in visited_for_levels:
-            node_levels[root] = 1
-            queue.append(root)
-            visited_for_levels.add(root)
+        depths[root] = 1
 
     while queue:
-        current_node = queue.popleft()
-        current_level = node_levels[current_node]
+        current_node, current_depth = queue.popleft()
+        children = all_taxo_dict.get(current_node, [])
+        for child in children:
+            if child not in visited_for_depth:
+                visited_for_depth.add(child)
+                depths[child] = current_depth + 1
+                queue.append((child, current_depth + 1))
+    print("Node depth calculation complete.")
 
-        if current_node in all_taxo_dict:
-            for child in all_taxo_dict[current_node]:
-                if child not in visited_for_levels:
-                    visited_for_levels.add(child)
-                    node_levels[child] = current_level + 1
-                    queue.append(child)
-    print("Node level calculation complete.")
+    memo = {}
+
+    def get_all_descendants(start_node):
+        if start_node in memo:
+            return memo[start_node]
+        descendants = set()
+        queue = deque(all_taxo_dict.get(start_node, []))
+        visited = set(queue)
+        while queue:
+            current_node = queue.popleft()
+            descendants.add(current_node)
+            children = all_taxo_dict.get(current_node, [])
+            for c in children:
+                if c not in visited:
+                    visited.add(c)
+                    queue.append(c)
+        memo[start_node] = descendants
+        return descendants
+
+    raw_scores = {}
+    for node in tqdm(concept_set, desc="Calculating raw scores (h + log(l+1))"):
+        h = depths.get(node, 1)
+        l = len(get_all_descendants(node))
+        raw_scores[node] = h + np.log1p(l)
+
+    all_raw_values = list(raw_scores.values())
+    raw_score_min = min(all_raw_values)
+    raw_score_max = max(all_raw_values)
+    raw_score_range = raw_score_max - \
+        raw_score_min if raw_score_max > raw_score_min else 1.0
+
+    normalized_radii = {
+        node: 1.0 - ((score - raw_score_min) / raw_score_range)
+        for node, score in raw_scores.items()
+    }
+    print("Final normalized radii calculation complete.")
 
     if args.dataset == 'computer_science':
         supernode = concept_id['computer science']
@@ -397,13 +435,13 @@ def pre_process_mag(args, outID=True):
     print("Preprocessing complete.")
 
     with open(f'../levels/{args.dataset}_levels.json', 'w') as f:
-        json.dump(node_levels, f, indent=4)
+        json.dump(normalized_radii, f, indent=4)
 
     return (
         concept_set, concept_id, id_concept, id_context, train_concept_set, taxo_dict,
         sampled_negative_parent_dict, child_parent_negative_parent_triple, parent_list, child_list,
         negative_parent_list, all_taxo_dict, path2root, child_parent_pair,
-        child_neg_parent_pair, val_concepts_ids, val_gts_ids, test_concepts_ids, test_gts_ids, node_levels
+        child_neg_parent_pair, val_concepts_ids, val_gts_ids, test_concepts_ids, test_gts_ids, normalized_radii
     )
 
 

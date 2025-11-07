@@ -56,7 +56,7 @@ parser.add_argument('--beta', type=float, default=0.5,
                     help='Negative sample margin')
 parser.add_argument('--vmf_margin', type=float,
                     default=0.5, help='Margin for VMF loss')
-parser.add_argument('--c', type=float, default=0.5,
+parser.add_argument('--c', type=float, default=0.7,
                     help='parameter c for welsch loss')
 parser.add_argument('--is_multi_parent', type=bool,
                     default=True, help='If it is a multi parent taxonomy')
@@ -138,10 +138,10 @@ def experiment(args):
 
 
 if __name__ == '__main__':
-    args.gpu_id = 2
-    args.expID = 3
-    if args.dataset == 'wordnet_verb':
-        args.epochs = 35
-    else:
-        args.epochs = 55
+    # args.gpu_id = 2
+    # args.expID = 3
+    # if args.dataset == 'wordnet_verb':
+    #     args.epochs = 35
+    # else:
+    #     args.epochs = 55
     experiment(args)

@@ -78,6 +78,6 @@ print(args)
 
 # create_mag_data(args)
 exp = Experiments(args)
-exp.visualize_angle_distributions(
-    tag='test', path='/home/nitish/Polartaxo/final_result/mesh/experiment_3_varied_geometric_weight/experiment_bert_mesh_2_60_1024_0.5_128_0.5_0.5.pt')
+exp.level_wise_prediction(
+    tag='test', path='/home/nitish/Polartaxo/result/mesh/train/experiment_bert_mesh_5_55_512_0.5_512_0.7_0.7_0.3.checkpoint')
 # exp.predict(tag='test', path='/home/nitish/Polartaxo/result/mesh/train/experiment_3_varied_geometric_weight/experiment_bert_mesh_2_60_1024_0.5_128_0.8_0.5.')

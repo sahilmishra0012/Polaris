@@ -6,6 +6,59 @@ import pytz
 from datetime import datetime, timezone
 import math
 import matplotlib.pyplot as plt
+import os
+
+
+def plot_radii_comparison(query_info, top_candidates_info, save_path, principle='traditional'):
+    fig, ax = plt.subplots(figsize=(8, 8), dpi=120)
+
+    all_concepts = [query_info] + top_candidates_info
+    all_radii = [c['radius'] for c in all_concepts]
+    max_radius = max(all_radii) if all_radii else 1.0
+
+    colors = plt.cm.viridis(np.linspace(0, 1, 5))
+
+    query_circle = plt.Circle((0, 0), query_info['radius'], color=colors[0], alpha=0.4,
+                              label=f"Query: {query_info['name']}")
+    ax.add_patch(query_circle)
+
+    for i, candidate in enumerate(top_candidates_info):
+        candidate_circle = plt.Circle((0, 0), candidate['radius'], color=colors[i + 1], alpha=0.4,
+                                      label=f"Top {i+1}: {candidate['name']}")
+        ax.add_patch(candidate_circle)
+
+    angle_step = 65
+
+    angle = np.deg2rad(10)
+    text_radius = query_info['radius'] + 0.05 * max_radius
+    x_q = text_radius * np.cos(angle)
+    y_q = text_radius * np.sin(angle)
+    ax.text(x_q, y_q, f"Query\n(R: {query_info['radius']:.2f})",
+            ha='center', va='center', fontweight='bold', fontsize=10, color=colors[0])
+
+    for i, candidate in enumerate(top_candidates_info):
+        angle = np.deg2rad(10 + (i + 1) * angle_step)
+        text_radius = candidate['radius'] + 0.05 * max_radius
+        x_c = text_radius * np.cos(angle)
+        y_c = text_radius * np.sin(angle)
+        ax.text(x_c, y_c, f"Top {i+1}\n(R: {candidate['radius']:.2f})",
+                ha='center', va='center', fontsize=9, color=colors[i+1])
+
+    ax.set_aspect('equal', adjustable='box')
+    ax.set_xlim(-max_radius * 1.3, max_radius * 1.3)
+    ax.set_ylim(-max_radius * 1.3, max_radius * 1.3)
+    ax.axis('off')
+
+    title_principle = "Parent > Child" if principle == 'traditional' else "Child > Parent"
+    plt.title(f"Radius Comparison for Query: \"{query_info['name']}\"\n(Principle: {title_principle})",
+              fontweight='bold')
+
+    ax.legend(loc='upper right', bbox_to_anchor=(1.45, 1.0))
+
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+
+    plt.savefig(save_path, bbox_inches='tight')
+    plt.close(fig)
 
 
 def cartesian_to_spherical_angles(e):

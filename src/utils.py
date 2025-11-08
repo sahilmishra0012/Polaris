@@ -7,10 +7,294 @@ from datetime import datetime, timezone
 import math
 import matplotlib.pyplot as plt
 import os
+from sklearn.decomposition import PCA
+import plotly.graph_objects as go
+
+
+def plot_concept_space_map(query_info, predicted_info, ground_truth_info, save_path):
+
+    plt.style.use('dark_background')
+    fig, ax = plt.subplots(figsize=(10, 10), dpi=150)
+
+    all_concepts = [query_info, predicted_info] + ground_truth_info
+
+    unique_concepts = []
+    seen_names = set()
+    for concept in all_concepts:
+        if concept['name'] not in seen_names:
+            unique_concepts.append(concept)
+            seen_names.add(concept['name'])
+
+    concept_coords = {}
+    for concept in unique_concepts:
+        x_embed = concept['embedding'][0]
+        y_embed = concept['embedding'][1]
+
+        theta = np.arctan2(y_embed, x_embed)
+
+        conceptual_radius = concept['radius']
+
+        plot_x = conceptual_radius * np.cos(theta)
+        plot_y = conceptual_radius * np.sin(theta)
+        concept_coords[concept['name']] = (plot_x, plot_y)
+
+    plotted_radii = set()
+    for concept in unique_concepts:
+        r = concept['radius']
+        if r in plotted_radii or r < 1e-6:
+            continue
+        orbit = plt.Circle((0, 0), r, color='gray', linestyle='--',
+                           linewidth=0.8, fill=False, alpha=0.6)
+        ax.add_patch(orbit)
+        plotted_radii.add(r)
+
+    for concept in unique_concepts:
+        x, y = concept_coords[concept['name']]
+        name = concept['name']
+        radius_text = f"\n(R: {concept['radius']:.2f})"
+
+        if name == query_info['name']:
+            ax.scatter(x, y, s=400, c='gold', marker='*',
+                       zorder=10, label=f"Query")
+            ax.text(x, y, f" {name}{radius_text}", ha='center',
+                    va='top', fontsize=10, color='gold', fontweight='bold')
+        elif name == predicted_info['name']:
+            ax.scatter(x, y, s=200, c='deepskyblue', marker='o',
+                       zorder=10, label=f"Prediction")
+            ax.text(x, y, f" {name}{radius_text}", ha='center',
+                    va='top', fontsize=9, color='deepskyblue')
+        else:
+            ax.scatter(x, y, s=250, c='limegreen', marker='D',
+                       zorder=10, label=f"Ground Truth")
+            ax.text(x, y, f" {name}{radius_text}", ha='center',
+                    va='top', fontsize=9, color='limegreen')
+
+    ax.legend(loc='upper right')
+    ax.set_title(
+        f"Concept Space Map for Query '{query_info['name']}'", fontsize=14, pad=20)
+    ax.set_aspect('equal', adjustable='box')
+    ax.axis('off')
+
+    max_r = max([c['radius'] for c in all_concepts if 'radius' in c] + [0])
+    ax.set_xlim(-max_r * 1.3, max_r * 1.3)
+    ax.set_ylim(-max_r * 1.3, max_r * 1.3)
+
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    plt.savefig(save_path, bbox_inches='tight')
+    plt.close(fig)
+
+
+def plot_static_solar_system(query_info, candidates_info, ground_truth_info, save_path):
+    plt.style.use('dark_background')
+    fig, ax = plt.subplots(figsize=(10, 10), dpi=150)
+
+    all_concepts = [query_info] + candidates_info + ground_truth_info
+
+    unique_concepts = []
+    seen_names = set()
+    for concept in all_concepts:
+        if concept['name'] not in seen_names:
+            unique_concepts.append(concept)
+            seen_names.add(concept['name'])
+
+    embeddings = np.array([c['embedding'] for c in unique_concepts])
+
+    if len(embeddings) < 2:
+        print(
+            f"Warning: Not enough unique points ({len(embeddings)}) for 2D PCA. Skipping plot.")
+        return
+
+    pca = PCA(n_components=2)
+    low_dim_embeddings = pca.fit_transform(embeddings)
+
+    concept_coords = {}
+    for i, concept in enumerate(unique_concepts):
+        vec = low_dim_embeddings[i]
+        conceptual_radius = concept['radius']
+
+        theta = np.arctan2(vec[1], vec[0])
+
+        plot_x = conceptual_radius * np.cos(theta)
+        plot_y = conceptual_radius * np.sin(theta)
+        concept_coords[concept['name']] = (plot_x, plot_y)
+
+    plotted_radii = set()
+    for concept in candidates_info + ground_truth_info:
+        r = concept['radius']
+        if r in plotted_radii or r == 0:
+            continue
+
+        orbit = plt.Circle((0, 0), r, color='gray', linestyle='--',
+                           linewidth=0.8, fill=False, alpha=0.6)
+        ax.add_patch(orbit)
+        plotted_radii.add(r)
+
+    ax.scatter(0, 0, s=400, c='gold', marker='*',
+               zorder=10, label='Query (Sun)')
+    ax.text(0, 0, f" {query_info['name']}\n (R: {query_info['radius']:.2f})",
+            ha='center', va='top', fontsize=9, color='white', fontweight='bold')
+
+    def plot_planets(concepts, color, marker, label):
+        for concept in concepts:
+            x, y = concept_coords[concept['name']]
+            ax.scatter(x, y, s=150, c=color, marker=marker,
+                       zorder=10, label=label)
+            ax.text(x, y, f" {concept['name']}\n (R: {concept['radius']:.2f})",
+                    ha='center', va='top', fontsize=9, color='white')
+
+    plot_planets(candidates_info, color='deepskyblue',
+                 marker='o', label='Predicted')
+    plot_planets(ground_truth_info, color='limegreen',
+                 marker='D', label='Ground Truth')
+
+    handles, labels = ax.get_legend_handles_labels()
+    unique_labels = dict(zip(labels, handles))
+    ax.legend(unique_labels.values(), unique_labels.keys(), loc='upper right')
+
+    ax.set_title(
+        f"Concept Solar System for Query: '{query_info['name']}'", fontsize=16, pad=20)
+    ax.set_aspect('equal', adjustable='box')
+    ax.axis('off')
+
+    max_r = max([c['radius'] for c in all_concepts if 'radius' in c] + [0])
+    ax.set_xlim(-max_r * 1.2, max_r * 1.2)
+    ax.set_ylim(-max_r * 1.2, max_r * 1.2)
+
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    plt.savefig(save_path, bbox_inches='tight')
+    plt.close(fig)
+
+
+def plot_interactive_solar_system(query_info, candidates_info, ground_truth_info, save_path, dim='3d'):
+
+    all_concepts = [query_info] + candidates_info + ground_truth_info
+
+    unique_concepts = []
+    seen_names = set()
+    for concept in all_concepts:
+        if concept['name'] not in seen_names:
+            unique_concepts.append(concept)
+            seen_names.add(concept['name'])
+
+    embeddings = np.array([c['embedding'] for c in unique_concepts])
+    n_components = 3 if dim == '3d' else 2
+
+    if len(embeddings) < n_components:
+        print(
+            f"Warning: Not enough unique points ({len(embeddings)}) for {n_components}D PCA. Skipping plot.")
+        return
+
+    pca = PCA(n_components=n_components)
+    low_dim_embeddings = pca.fit_transform(embeddings)
+
+    concept_coords = {}
+    for i, concept in enumerate(unique_concepts):
+        vec = low_dim_embeddings[i]
+        radius = concept['radius']
+
+        if dim == '3d':
+            x, y, z = vec
+            theta = np.arctan2(y, x)
+            phi = np.arccos(z / (np.linalg.norm(vec) + 1e-8))
+            plot_x = radius * np.sin(phi) * np.cos(theta)
+            plot_y = radius * np.sin(phi) * np.sin(theta)
+            plot_z = radius * np.cos(phi)
+        else:
+            x, y = vec
+            theta = np.arctan2(y, x)
+            plot_x = radius * np.cos(theta)
+            plot_y = radius * np.sin(theta)
+            plot_z = 0
+
+        concept_coords[concept['name']] = (plot_x, plot_y, plot_z)
+
+    fig = go.Figure()
+
+    def add_concept_trace(concepts, name, symbol, color, size):
+        for concept in concepts:
+            x, y, z = concept_coords[concept['name']]
+            hover_text = f"<b>{concept['name']}</b><br>Type: {name}<br>Radius: {concept['radius']:.3f}"
+
+            plot_func = go.Scatter3d if dim == '3d' else go.Scatter
+            fig.add_trace(plot_func(
+                x=[x], y=[y], z=[z] if dim == '3d' else None,
+                mode='markers',
+                marker=dict(symbol=symbol, color=color, size=size),
+                name=name,
+                hoverinfo='text',
+                text=[hover_text]
+            ))
+
+    fig.add_trace(go.Scatter3d(
+        x=[0], y=[0], z=[0],
+        mode='markers',
+        marker=dict(symbol='circle', color='gold', size=14),
+        name='Query (Sun)',
+        hoverinfo='text',
+        text=[
+            f"<b>{query_info['name']}</b><br>Type: Query<br>Radius: {query_info['radius']:.3f}"]
+    ))
+
+    add_concept_trace(candidates_info, 'Predicted', 'circle', 'deepskyblue', 8)
+    add_concept_trace(ground_truth_info, 'Ground Truth',
+                      'diamond', 'limegreen', 12)
+
+    plotted_radii = set()
+    for concept in candidates_info + ground_truth_info:
+        r = concept['radius']
+        if r in plotted_radii or r == 0:
+            continue
+
+        if dim == '3d':
+            theta_orb = np.linspace(0, 2 * np.pi, 100)
+            x_orb = r * np.cos(theta_orb)
+            y_orb = r * np.sin(theta_orb)
+            z_orb = np.zeros_like(x_orb)
+            fig.add_trace(go.Scatter3d(x=x_orb, y=y_orb, z=z_orb, mode='lines',
+                                       line=dict(color='white',
+                                                 width=1, dash='dot'),
+                                       name=f'Orbit (r={r:.2f})', hoverinfo='none'))
+        else:
+            theta_orb = np.linspace(0, 2 * np.pi, 100)
+            x_orb = r * np.cos(theta_orb)
+            y_orb = r * np.sin(theta_orb)
+            fig.add_trace(go.Scatter(x=x_orb, y=y_orb, mode='lines',
+                                     line=dict(color='gray',
+                                               width=1, dash='dot'),
+                                     name=f'Orbit (r={r:.2f})', hoverinfo='none'))
+        plotted_radii.add(r)
+
+    title = f"Interactive Solar System for Query: '{query_info['name']}'"
+    if dim == '3d':
+        fig.update_layout(
+            title=title,
+            scene=dict(
+                xaxis=dict(visible=False),
+                yaxis=dict(visible=False),
+                zaxis=dict(visible=False),
+                bgcolor='black',
+                aspectmode='cube'
+            ),
+            showlegend=True,
+            legend_title_text='Concept Type'
+        )
+    else:
+        fig.update_layout(
+            title=title,
+            xaxis=dict(visible=False),
+            yaxis=dict(visible=False),
+            plot_bgcolor='black',
+            showlegend=True,
+            legend_title_text='Concept Type',
+            yaxis_scaleanchor="x"
+        )
+
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    fig.write_html(save_path)
 
 
 def plot_radii_comparison(query_info, top_candidates_info, save_path, principle='traditional'):
-    fig, ax = plt.subplots(figsize=(8, 8), dpi=120)
+    fig, ax = plt.subplots(figsize=(8, 8), dpi=150)
 
     all_concepts = [query_info] + top_candidates_info
     all_radii = [c['radius'] for c in all_concepts]

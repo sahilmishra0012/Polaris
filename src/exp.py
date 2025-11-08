@@ -17,7 +17,6 @@ from matplotlib.patches import Ellipse
 from sklearn.decomposition import PCA
 import gc
 import seaborn as sns
-import matplotlib.pyplot as plt
 import csv
 import wandb
 
@@ -344,9 +343,16 @@ class Experiments(object):
             num_candidates = candidates_k.size(0)
 
             candidate_radii_tensor = torch.tensor([
-                self.test_set.levels[cid] for cid in candidate_list
+                self.test_set.levels[cid]['radii'] for cid in candidate_list
             ]).to(device=q_z.device)
+            candidate_depths = torch.tensor([self.test_set.levels[cid]['depth']
+                                             for cid in candidate_list]).to(q_z.device)
+            candidate_descendants = torch.tensor([
+                self.test_set.levels[cid]['descendents'] for cid in candidate_list]).to(q_z.device)
+            score_min = self.test_set.levels[0]['raw_score_min']
+            score_range = self.test_set.levels[0]['raw_score_range']
 
+            candidate_radii_list = list()
             for i in tqdm(range(num_queries), desc='evaluating queries'):
                 q_sph = q_z[i].unsqueeze(0).expand(num_candidates, -1)
 
@@ -360,56 +366,71 @@ class Experiments(object):
                 angular_score = dot_product / \
                     (norm_q * norm_candidates + epsilon)
 
-                weights = torch.nn.functional.softmax(
-                    angular_score, dim=0)
-                query_radius = torch.sum(weights * candidate_radii_tensor)
-                delta = 0.2
-                sigma = 0.1
+                query_radius = candidate_depths+1
+                candidate_updated_radius = (
+                    candidate_depths+1)+torch.log1p(candidate_descendants+1)
+                query_radius_normalized = 1 - \
+                    ((query_radius-score_min)/(score_range))
+                candidate_radius_normalized = 1 - \
+                    ((candidate_updated_radius-score_min)/(score_range))
 
-                query_radii_list.append(query_radius.item())
-
-                radius_diff = torch.abs(candidate_radii_tensor-query_radius)
+                radius_diff = torch.abs(
+                    candidate_radius_normalized-query_radius_normalized)
 
                 radius_score = torch.where(
-                    angular_score > 1-(7*radius_diff**2), 1.0, 0.0)
+                    angular_score > 1-(radius_diff**2), 1.0, 0.0)
+                final_score = radius_score*angular_score
 
-                final_score = radius_score * angular_score
                 score_list.append(final_score)
+                candidate_radii_list.append(candidate_radius_normalized)
+                query_radii_list.append(query_radius_normalized)
 
             score_matrix = torch.stack(score_list, dim=0)
             print("Score matrix size:", score_matrix.size())
             sorted_scores, indices = score_matrix.sort(dim=1, descending=True)
             print(sorted_scores[:, :5])
 
-            print("Generating radius comparison plots for top predictions...")
-            num_plots_to_generate = 5
+            print("Generating static solar system plots for top 5 predictions...")
+            num_queries_to_plot = 5
+            num_preds_to_plot = 5
 
-            principle_in_use = 'solar_system'
-
-            for i in range(min(num_plots_to_generate, num_queries)):
+            for i in range(min(num_queries_to_plot, num_queries)):
                 query_id = self.test_set.test_concepts_id[i]
-                query_info = {
-                    'name': self.test_set.id_concept[query_id],
-                    'radius': query_radii_list[i]
-                }
 
-                top_3_indices = indices[i, :3].cpu().numpy()
-                top_3_ids = candidate_list[top_3_indices]
+                gt_ids = self.test_set.test_gt_id[i]
+                ground_truth_info = []
+                if gt_ids:
+                    gt_indices = [np.where(candidate_list == gid)[0][0]
+                                  for gid in gt_ids if gid in candidate_list]
+                    for gt_idx in gt_indices:
+                        gt_id = candidate_list[gt_idx]
+                        ground_truth_info.append({
+                            'name': self.test_set.id_concept[gt_id],
+                            'radius': candidate_radii_tensor[gt_idx].item(),
+                            'embedding': candidates_sphere[gt_idx].cpu().numpy()
+                        })
 
-                top_candidates_info = []
-                for candidate_idx, candidate_id in zip(top_3_indices, top_3_ids):
-                    info = {
-                        'name': self.test_set.id_concept[candidate_id],
-                        'radius': candidate_radii_tensor[candidate_idx].item()
+                top_indices = indices[i, :num_preds_to_plot].cpu().numpy()
+                for rank, pred_idx in enumerate(top_indices):
+                    pred_id = candidate_list[pred_idx]
+
+                    query_info = {
+                        'name': self.test_set.id_concept[query_id],
+                        'radius': query_radii_list[i][pred_idx].item(),
+                        'embedding': q_z[i].cpu().numpy()
                     }
-                    top_candidates_info.append(info)
 
-                plot_save_path = f'../results/{self.args.dataset}/plots/query_{query_id}_radii_comparison.png'
-                plot_radii_comparison(
-                    query_info, top_candidates_info, plot_save_path, principle=principle_in_use)
+                    predicted_info = {
+                        'name': self.test_set.id_concept[pred_id],
+                        'radius': candidate_radii_list[i][pred_idx].item(),
+                        'embedding': candidates_sphere[pred_idx].cpu().numpy()
+                    }
 
-            print(
-                f"{num_plots_to_generate} plots saved in '../results/{self.args.dataset}/plots/'")
+                    plot_save_path = f'../results/{self.args.dataset}/plots/query_{query_id}_vs_pred_rank_{rank+1}.png'
+                    plot_concept_space_map(
+                        query_info, predicted_info, ground_truth_info, plot_save_path)
+
+            print(f"Plots saved in '../results/{self.args.dataset}/plots/'")
 
             if self.args.is_multi_parent is True:
                 candidate_list = np.array(list(self.test_set.true_concept_set))

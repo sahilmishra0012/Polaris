@@ -308,7 +308,12 @@ def pre_process_mag(args, outID=True):
         raw_score_min if raw_score_max > raw_score_min else 1.0
 
     normalized_radii = {
-        node: 1.0 - ((score - raw_score_min) / raw_score_range)
+        node: {'radii': 1.0 - ((score - raw_score_min) / raw_score_range),
+               'depth': depths.get(node),
+               'descendents': len(get_all_descendants(node)),
+               'raw_score_min': raw_score_min,
+               'raw_score_range': raw_score_range,
+               }
         for node, score in raw_scores.items()
     }
     print("Final normalized radii calculation complete.")

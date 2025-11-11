@@ -7,6 +7,7 @@ from utils import *
 from exp import Experiments
 import torch.multiprocessing as tmp
 from utils import print_local_time, set_seed
+from svgd import SVGD_Uniform_Sphere
 import wandb
 
 os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
@@ -36,7 +37,7 @@ parser.add_argument('--negsamples', type=int, default=20,
 parser.add_argument('--model', type=str, default='bert',
                     help='Pretained Language Model')
 
-parser.add_argument('--expID', type=int, default=5, help='-th of experiments')
+parser.add_argument('--expID', type=int, default=8, help='-th of experiments')
 parser.add_argument('--epochs', type=int, default=55, help='training epochs')
 parser.add_argument('--batch_size', type=int, default=512,
                     help='training batch size')
@@ -64,6 +65,7 @@ parser.add_argument('--geometric_weight', type=float,
                     default=0.5, help='Importance of Geometric Loss')
 parser.add_argument('--probabilistic_weight', type=float,
                     default=0.5, help='Importance of Probabilistic Loss')
+parser.add_argument('--svgd_weight', help='Importance of Svgd Loss')
 
 # Others
 parser.add_argument('--cuda', type=bool, default=True,

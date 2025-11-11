@@ -18,14 +18,15 @@ def log_i0_stable(x):
     log_i0_safe = torch.log(i0(safe_x) + 1e-8)
 
     unsafe_x = torch.where(mask, torch.ones_like(x) * threshold, x)
-    log_i0_approx = unsafe_x - 0.5 * torch.log(2 * math.pi * unsafe_x)
+    log_i0_approx = unsafe_x - \
+        torch.tensor(0.5) * torch.log(2 * math.pi * unsafe_x)
 
     return torch.where(mask, log_i0_safe, log_i0_approx)
 
 
 def log_Z_d(kappa, d):
     log_bessel_func = log_i0_stable(kappa)
-    return (((d/2)-1)*torch.log(kappa))-((0.5*d*math.log(2*math.pi))-log_bessel_func)
+    return (((d/2)-1)*torch.log(kappa))-((torch.tensor(0.5)*d*math.log(2*math.pi))-log_bessel_func)
 
 
 def A_d(kappa, dim):
@@ -60,9 +61,13 @@ class VMFRegularisation(nn.Module):
     def forward(self, p_emb, c_emb, n_emb, margin):
         mu_p, mu_c, mu_n = self.mu_predictor(
             p_emb), self.mu_predictor(c_emb), self.mu_predictor(n_emb)
-        kappa_p = self.kappa_predictor(p_emb)
-        kappa_c = self.kappa_predictor(c_emb)
-        kappa_n = self.kappa_predictor(n_emb)
+        # kappa_p = self.kappa_predictor(p_emb)
+        # kappa_c = self.kappa_predictor(c_emb)
+        # kappa_n = self.kappa_predictor(n_emb)
+
+        kappa_p = torch.tensor(0.5)
+        kappa_c = torch.tensor(0.5)
+        kappa_n = torch.tensor(0.5)
 
         kl_pos = vmf_kl_divergence(
             mu_c, kappa_c, mu_p, kappa_p, self.embedding_dim)

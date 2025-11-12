@@ -345,40 +345,35 @@ def plot_radii_comparison(query_info, top_candidates_info, save_path, principle=
     plt.close(fig)
 
 
-def cartesian_to_spherical_angles(e):
-    _, d = e.shape
-    if d < 3:
+def cartesian_to_spherical_angles(e: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    batch_size, d = e.shape
+
+    if d < 4:
         raise ValueError(
-            "Input dimension must be at least 3 to compute the required angles.")
+            f"Input dimension must be at least 4 to return theta, psi1, and psi2, but got d={d}.")
 
     eps = 1e-8
-    e_norm = e / (torch.norm(e, p=2, dim=1, keepdim=True) + eps)
 
-    e_sq = e_norm.pow(2)
-    cum_sq_from_back = torch.cumsum(torch.flip(e_sq, dims=[1]), dim=1)
-    cum_sq_from_back = torch.flip(cum_sq_from_back, dims=[1])
+    e_sq = e.pow(2)
+    cum_sq_from_back = torch.flip(torch.cumsum(
+        torch.flip(e_sq, dims=[1]), dim=1), dims=[1])
 
-    numerator1 = e_norm[:, 0]
-    denominator1 = torch.sqrt(cum_sq_from_back[:, 0] + eps)
-    ratio1 = numerator1 / denominator1
-    clamped_ratio1 = torch.clamp(ratio1, -1.0 + eps, 1.0 - eps)
-    psi1 = torch.acos(clamped_ratio1)
+    denominators = torch.sqrt(cum_sq_from_back[:, :-1] + eps)
 
-    numerator2 = e_norm[:, 1]
-    denominator2 = torch.sqrt(cum_sq_from_back[:, 1] + eps)
-    ratio2 = numerator2 / denominator2
-    clamped_ratio2 = torch.clamp(ratio2, -1.0 + eps, 1.0 - eps)
-    psi2 = torch.acos(clamped_ratio2)
+    numerators = e[:, :-1]
+    ratio = torch.clamp(numerators / denominators, -1.0 + eps, 1.0 - eps)
+    angles = torch.acos(ratio)
 
-    e_d_minus_1 = e_norm[:, d - 2]
-    e_d = e_norm[:, d - 1]
+    e_d = e[:, -1]
+    last_angle = angles[:, -1]
+    adjusted_last_angle = torch.where(
+        e_d < 0, 2 * math.pi - last_angle, last_angle)
 
-    theta_denom = torch.sqrt(e_d_minus_1**2 + e_d**2 + eps)
-    theta_ratio = e_d_minus_1 / theta_denom
+    angles[:, -1] = adjusted_last_angle
 
-    clamped_theta_ratio = torch.clamp(theta_ratio, -1.0 + eps, 1.0 - eps)
-    theta_base = torch.acos(clamped_theta_ratio)
-    theta = torch.where(e_d < 0, 2 * math.pi - theta_base, theta_base)
+    theta = angles[:, -1]
+    psi1 = angles[:, 0]
+    psi2 = angles[:, 1]
 
     return theta, psi1, psi2
 

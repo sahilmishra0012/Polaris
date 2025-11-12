@@ -11,6 +11,7 @@ import torch.nn.functional as F
 import matplotlib.pyplot as plt
 from vmf import VMFRegularisation
 from manifolds.sphere import Sphere
+from svgd import *
 
 
 class PolarTaxo(nn.Module):
@@ -144,7 +145,19 @@ class PolarTaxo(nn.Module):
         welsch_cp = torch.log(self.welsch_loss(ang_distcp))
         welsch_cn = torch.log(self.welsch_loss(ang_distcn))
 
-        loss = self.args.geometric_weight*F.relu(welsch_cp-welsch_cn+self.args.beta).mean()+(1-self.args.geometric_weight)*self.vmf_regulariser(
+        loss_vmf, mu_p, mu_c, mu_n = self.vmf_regulariser(
             parent_sphere, child_sphere, negative_sphere, self.args.vmf_margin)
+        svgd_combined = SVGD_Combined_Sphere()
+        parent_svgd_grad = svgd_combined(parent_sphere, mu_p)
+        child_svgd_grad = svgd_combined(child_sphere, mu_c)
+        negative_svgd_grad = svgd_combined(negative_sphere, mu_n)
 
-        return loss
+        taxo_loss = self.args.geometric_weight * \
+            F.relu(welsch_cp-welsch_cn+self.args.beta).mean() + \
+            (1-self.args.geometric_weight)*loss_vmf
+        svgd_loss = svgd_loss = parent_svgd_grad.norm(p=2, dim=1).mean() + \
+            child_svgd_grad.norm(p=2, dim=1).mean() + \
+            negative_svgd_grad.norm(p=2, dim=1).mean()
+        final_loss = taxo_loss+0.1*svgd_loss
+
+        return final_loss

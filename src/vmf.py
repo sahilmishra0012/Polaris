@@ -61,14 +61,9 @@ class VMFRegularisation(nn.Module):
     def forward(self, p_emb, c_emb, n_emb, margin):
         mu_p, mu_c, mu_n = self.mu_predictor(
             p_emb), self.mu_predictor(c_emb), self.mu_predictor(n_emb)
-        # kappa_p = self.kappa_predictor(p_emb)
-        # kappa_c = self.kappa_predictor(c_emb)
-        # kappa_n = self.kappa_predictor(n_emb)
-
-        kappa_p = torch.tensor(0.5)
-        kappa_c = torch.tensor(0.5)
-        kappa_n = torch.tensor(0.5)
-
+        kappa_p = self.kappa_predictor(p_emb)
+        kappa_c = self.kappa_predictor(c_emb)
+        kappa_n = self.kappa_predictor(n_emb)
         kl_pos = vmf_kl_divergence(
             mu_c, kappa_c, mu_p, kappa_p, self.embedding_dim)
         kl_neg = vmf_kl_divergence(
@@ -76,4 +71,4 @@ class VMFRegularisation(nn.Module):
 
         loss = F.relu(margin+kl_pos-kl_neg)
 
-        return loss.mean()
+        return loss.mean(), mu_p, mu_c, mu_n

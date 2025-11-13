@@ -136,7 +136,7 @@ class Experiments(object):
             print("Psi Loss: ", psi_train_loss)
             print("Loss: ", train_loss)
 
-            test_metrics = self.level_wise_prediction()
+            test_metrics = self.predict()
             test_acc = test_metrics["Prec@1"]
             test_mrr = test_metrics["MRR"]
             if test_acc >= old_test_acc or test_mrr >= old_test_mrr:
@@ -364,11 +364,11 @@ class Experiments(object):
                 epsilon = 1e-8
 
                 angular_score = dot_product / \
-                    (norm_q * norm_candidates + epsilon)
+                    ((norm_q * norm_candidates) + epsilon)
 
                 query_radius = candidate_depths+1
                 candidate_updated_radius = (
-                    candidate_depths+1)+torch.log1p(candidate_descendants+1)
+                    candidate_depths+1)+((torch.log1p(candidate_descendants))/torch.log(torch.tensor(2)))
                 query_radius_normalized = 1 - \
                     ((query_radius-score_min)/(score_range))
                 candidate_radius_normalized = 1 - \
@@ -384,6 +384,8 @@ class Experiments(object):
                 score_list.append(final_score)
                 candidate_radii_list.append(candidate_radius_normalized)
                 query_radii_list.append(query_radius_normalized)
+
+            print(candidate_radii_list[2][:10])
 
             score_matrix = torch.stack(score_list, dim=0)
             print("Score matrix size:", score_matrix.size())
@@ -477,136 +479,97 @@ class Experiments(object):
         return test_metrics
 
     def visualize_angle_distributions(self, tag=None, path=None):
-        print("Prediction starting.....")
-        store_csv = False
+
+        print("Starting global distribution analysis...")
         if tag == "test" and path:
+            print(f"Loading model from: {path}")
             self.model.load_state_dict(torch.load(path))
-            store_csv = True
 
         self.model.eval()
         with torch.no_grad():
-            q_z = self.model.child_projection(
-                self.test_set.encode_query)
+            q_z = self.model.child_projection(self.test_set.encode_query)
             q_sphere = self.model.vmf_regulariser.mu_predictor(q_z)
             q_k = self.model.vmf_regulariser.kappa_predictor(q_z)
-            candidates_sphere = list()
-            candidates_k = list()
 
-            for encode_candidate in self.test_loader:
-                candidate_z = self.model.par_projection(
-                    encode_candidate)
+            candidates_sphere_list = []
+            candidates_k_list = []
+            print("Processing all candidates...")
+            for encode_candidate in tqdm(self.test_loader, desc='Loading Candidates'):
+                candidate_z = self.model.par_projection(encode_candidate)
                 candidate_sphere = self.model.vmf_regulariser.mu_predictor(
                     candidate_z)
                 candidate_k = self.model.vmf_regulariser.kappa_predictor(
                     candidate_z)
-                candidates_sphere.append(candidate_sphere)
-                candidates_k.append(candidate_k)
+                candidates_sphere_list.append(candidate_sphere)
+                candidates_k_list.append(candidate_k)
 
-            candidates_sphere = torch.cat(candidates_sphere, dim=0)
-            candidates_k = torch.cat(candidates_k, dim=0)
-            num_queries = q_sphere.size(0)
+            candidates_sphere = torch.cat(candidates_sphere_list, dim=0)
+            candidates_k = torch.cat(candidates_k_list, dim=0)
 
-            if store_csv is True:
-                all_query_thetas, all_query_psi1s, all_query_psi2s, all_query_ks = [], [], [], []
-                all_top1_pred_thetas, all_top1_pred_psi1s, all_top1_pred_psi2s, all_top1_pred_ks = [], [], [], []
+            print("All embeddings loaded. Calculating angles...")
 
-                with open('angle_distributions.csv', 'w', newline='') as csvfile:
-                    csv_writer = csv.writer(csvfile)
-                    header = [
-                        'query_theta', 'query_psi1', 'query_psi2', 'query_k',
-                        'pred1_theta', 'pred1_psi1', 'pred1_psi2', 'pred1_k',
-                        'pred2_theta', 'pred2_psi1', 'pred2_psi2', 'pred2_k',
-                        'pred3_theta', 'pred3_psi1', 'pred3_psi2', 'pred3_k'
-                    ]
-                    csv_writer.writerow(header)
+            q_thetas, q_psi1s, q_psi2s = cartesian_to_spherical_angles(
+                q_sphere)
+            c_thetas, c_psi1s, c_psi2s = cartesian_to_spherical_angles(
+                candidates_sphere)
 
-                    for i in tqdm(range(num_queries), desc='Evaluating Queries'):
-                        q_sph = q_sphere[i].unsqueeze(0)
-                        q_k_val = q_k[i]
+            all_data = {
+                'query_theta': q_thetas.cpu().numpy(),
+                'query_psi1': q_psi1s.cpu().numpy(),
+                'query_psi2': q_psi2s.cpu().numpy(),
+                'query_k': q_k.cpu().numpy(),
+                'candidate_theta': c_thetas.cpu().numpy(),
+                'candidate_psi1': c_psi1s.cpu().numpy(),
+                'candidate_psi2': c_psi2s.cpu().numpy(),
+                'candidate_k': candidates_k.cpu().numpy(),
+            }
 
-                        q_sph_expanded = q_sph.expand(
-                            candidates_sphere.shape[0], -1)
-                        geometric_score = torch.sum(
-                            candidates_sphere * q_sph_expanded, dim=1)
-                        final_score = geometric_score
+            print("Generating combined distribution plots...")
 
-                        _, top_indices = torch.topk(final_score, 3)
-                        top_3_candidates_sph = candidates_sphere[top_indices]
-                        top_3_candidates_k = candidates_k[top_indices]
+            fig, axes = plt.subplots(1, 4, figsize=(24, 6))
+            fig.suptitle(
+                'Global Distributions of Query vs. Candidate Angles and K-Values', fontsize=20)
 
-                        q_theta, q_psi1, q_psi2 = cartesian_to_spherical_angles(
-                            q_sph)
-                        pred_thetas, pred_psi1s, pred_psi2s = cartesian_to_spherical_angles(
-                            top_3_candidates_sph)
+            plot_config = {'kde': True, 'bins': 50}
 
-                        row_data = [
-                            q_theta.item(), q_psi1.item(), q_psi2.item(), q_k_val.item(),
-                            pred_thetas[0].item(), pred_psi1s[0].item(
-                            ), pred_psi2s[0].item(), top_3_candidates_k[0].item(),
-                            pred_thetas[1].item(), pred_psi1s[1].item(
-                            ), pred_psi2s[1].item(), top_3_candidates_k[1].item(),
-                            pred_thetas[2].item(), pred_psi1s[2].item(
-                            ), pred_psi2s[2].item(), top_3_candidates_k[2].item()
-                        ]
-                        csv_writer.writerow(row_data)
+            sns.histplot(all_data['query_theta'], ax=axes[0],
+                         **plot_config, color='royalblue', label='Queries')
+            sns.histplot(all_data['candidate_theta'], ax=axes[0],
+                         **plot_config, color='darkorange', label='Candidates')
+            axes[0].set_title("Longitudinal Angle (θ)", fontsize=14)
+            axes[0].set_xlim(0, 2 * np.pi)
 
-                        all_query_thetas.append(q_theta.item())
-                        all_query_psi1s.append(q_psi1.item())
-                        all_query_psi2s.append(q_psi2.item())
-                        all_query_ks.append(q_k_val.item())
+            sns.histplot(all_data['query_psi1'], ax=axes[1], **
+                         plot_config, color='royalblue', label='Queries')
+            sns.histplot(all_data['candidate_psi1'], ax=axes[1], **
+                         plot_config, color='darkorange', label='Candidates')
+            axes[1].set_title("1st Latitudinal Angle (ψ1)", fontsize=14)
+            axes[1].set_xlim(0, np.pi)
 
-                        all_top1_pred_thetas.append(pred_thetas[0].item())
-                        all_top1_pred_psi1s.append(pred_psi1s[0].item())
-                        all_top1_pred_psi2s.append(pred_psi2s[0].item())
-                        all_top1_pred_ks.append(top_3_candidates_k[0].item())
+            sns.histplot(all_data['query_psi2'], ax=axes[2], **
+                         plot_config, color='royalblue', label='Queries')
+            sns.histplot(all_data['candidate_psi2'], ax=axes[2], **
+                         plot_config, color='darkorange', label='Candidates')
+            axes[2].set_title("2nd Latitudinal Angle (ψ2)", fontsize=14)
+            axes[2].set_xlim(0, np.pi)
 
-                if num_queries > 0:
-                    print("Generating angle and k-value distribution plots...")
+            sns.histplot(all_data['query_k'], ax=axes[3], **
+                         plot_config, color='royalblue', label='Queries')
+            sns.histplot(all_data['candidate_k'], ax=axes[3], **
+                         plot_config, color='darkorange', label='Candidates')
+            axes[3].set_title("K-Value (Concentration)", fontsize=14)
 
-                    fig, axes = plt.subplots(2, 4, figsize=(26, 10))
-                    fig.suptitle(
-                        'Distributions of Query vs. Top-1 Predicted Angles and K-Values', fontsize=20)
+            for i in range(4):
+                axes[i].set_ylabel('Frequency')
+                axes[i].legend()
+                if i < 3:
+                    axes[i].set_xlabel('Angle (radians)')
+                else:
+                    axes[i].set_xlabel('K Value')
 
-                    plot_config = {'kde': True, 'bins': 50}
+            plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+            save_path = "global_angle_and_k_distributions.png"
+            plt.savefig(save_path)
+            plt.show()
 
-                    sns.histplot(all_query_thetas, ax=axes[0, 0], **plot_config, color='royalblue').set_title(
-                        "Query: Longitudinal Angle (θ)", fontsize=14)
-                    sns.histplot(all_query_psi1s, ax=axes[0, 1], **plot_config, color='royalblue').set_title(
-                        "Query: 1st Latitudinal Angle (ψ1)", fontsize=14)
-                    sns.histplot(all_query_psi2s, ax=axes[0, 2], **plot_config, color='royalblue').set_title(
-                        "Query: 2nd Latitudinal Angle (ψ2)", fontsize=14)
-
-                    sns.histplot(all_top1_pred_thetas, ax=axes[1, 0], **plot_config, color='darkorange').set_title(
-                        'Top-1 Pred: Longitudinal Angle (θ)', fontsize=14)
-                    sns.histplot(all_top1_pred_psi1s, ax=axes[1, 1], **plot_config, color='darkorange').set_title(
-                        'Top-1 Pred: 1st Latitudinal Angle (ψ1)', fontsize=14)
-                    sns.histplot(all_top1_pred_psi2s, ax=axes[1, 2], **plot_config, color='darkorange').set_title(
-                        'Top-1 Pred: 2nd Latitudinal Angle (ψ2)', fontsize=14)
-
-                    sns.histplot(all_query_ks, ax=axes[0, 3], **plot_config, color='green').set_title(
-                        "Query: K-Value Distribution", fontsize=14)
-                    sns.histplot(all_top1_pred_ks, ax=axes[1, 3], **plot_config, color='purple').set_title(
-                        "Top-1 Pred: K-Value Distribution", fontsize=14)
-
-                    for i in range(4):
-                        axes[0, i].set_ylabel('Frequency')
-                        axes[1, i].set_ylabel('Frequency')
-                        if i < 3:
-                            axes[0, i].set_xlabel('Angle (radians)')
-                            axes[1, i].set_xlabel('Angle (radians)')
-                        else:
-                            axes[0, i].set_xlabel('K Value')
-                            axes[1, i].set_xlabel('K Value')
-
-                    axes[0, 0].set_xlim(0, 2 * np.pi)
-                    axes[1, 0].set_xlim(0, 2 * np.pi)
-                    axes[0, 1].set_xlim(0, np.pi)
-                    axes[1, 1].set_xlim(0, np.pi)
-                    axes[0, 2].set_xlim(0, np.pi)
-                    axes[1, 2].set_xlim(0, np.pi)
-
-                    plt.tight_layout(rect=[0, 0, 1, 0.96])
-                    plt.savefig("angle_and_k_distribution_plots.png")
-                    plt.show()
-
-                    print("Plots saved to angle_and_k_distribution_plots.png")
+            print(f"Plots saved to {save_path}")

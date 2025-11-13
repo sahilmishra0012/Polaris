@@ -299,7 +299,7 @@ def pre_process_mag(args, outID=True):
     for node in tqdm(concept_set, desc="Calculating raw scores (h + log(l+1))"):
         h = depths.get(node, 1)
         l = len(get_all_descendants(node))
-        raw_scores[node] = h + np.log1p(l)
+        raw_scores[node] = h + (np.log1p(l)/np.log(2))
 
     all_raw_values = list(raw_scores.values())
     raw_score_min = min(all_raw_values)

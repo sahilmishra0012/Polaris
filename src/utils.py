@@ -372,8 +372,8 @@ def cartesian_to_spherical_angles(e: torch.Tensor) -> tuple[torch.Tensor, torch.
     angles[:, -1] = adjusted_last_angle
 
     theta = angles[:, -1]
-    psi1 = angles[:, 0]
-    psi2 = angles[:, 1]
+    psi1 = angles[:, -2]
+    psi2 = angles[:, -3]
 
     return theta, psi1, psi2
 

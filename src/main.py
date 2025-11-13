@@ -125,7 +125,7 @@ def experiment(args):
     # args.expID = wandb.run
 
     exp = Experiments(args)
-    exp.train()
+    exp.train(checkpoint='/home/nitish/Polartaxo/result/mesh/train/experiment_bert_mesh_13_55_512_0.5_256_0.7_0.4_0.5.checkpoint')
     """Train the model"""
 
     # exp.predict(tag="test")

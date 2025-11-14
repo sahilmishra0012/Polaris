@@ -65,7 +65,11 @@ parser.add_argument('--geometric_weight', type=float,
                     default=0.5, help='Importance of Geometric Loss')
 parser.add_argument('--probabilistic_weight', type=float,
                     default=0.5, help='Importance of Probabilistic Loss')
-parser.add_argument('--svgd_weight', help='Importance of Svgd Loss')
+parser.add_argument(
+    '--svgd_weight', help='Importance of Svgd Loss', type=float)
+parser.add_argument('--kappa_align', help='Kappa Alignment', type=float)
+parser.add_argument('--kappa_repel', help='Kappa repulsion', type=float)
+parser.add_argument('--svgd_kernel', help='SVGD kernel')
 
 # Others
 parser.add_argument('--cuda', type=bool, default=True,
@@ -75,6 +79,9 @@ parser.add_argument('--seed', type=int, default=20,
                     help="seed for random generators")
 parser.add_argument('--method', type=str, default='normal',
                     help='Experiment method conducted')
+
+parser.add_argument('--exp_name', type=str,
+                    default='my old story', help='Experiment name')
 parser.add_argument('--resume', type=str, default='no', help='Resume a run')
 parser.add_argument('--run_id', type=str, default='',
                     help='Wandb run id for resumption')
@@ -95,7 +102,7 @@ def experiment(args):
         wandb.init(
             project='PolarTaxo',
 
-            name=f'{args.dataset}-{args.embed_size}-{args.beta}-{args.geometric_weight}',
+            name=f'{args.exp_name}-{args.dataset}',
             config=args,
 
         )
@@ -125,7 +132,7 @@ def experiment(args):
     # args.expID = wandb.run
 
     exp = Experiments(args)
-    exp.train(checkpoint='/home/nitish/Polartaxo/result/mesh/train/experiment_bert_mesh_13_55_512_0.5_256_0.7_0.4_0.5.checkpoint')
+    exp.train()
     """Train the model"""
 
     # exp.predict(tag="test")
@@ -139,11 +146,19 @@ def experiment(args):
     print("************END***************")
 
 
+# Additional Config
 if __name__ == '__main__':
-    # args.gpu_id = 2
-    # args.expID = 3
-    # if args.dataset == 'wordnet_verb':
-    #     args.epochs = 35
-    # else:
-    #     args.epochs = 55
+    args.gpu_id = 1
+    args.expID = 20
+    args.batch_size = 512
+    args.accumulation_steps = 10
+    args.geometric_weight = 0.7
+    args.c = 0.4
+    args.vmf_margin = 0.3
+    args.dataset = 'mesh'
+    args.svgd_weight = 0.1
+    if args.dataset == 'mesh':
+        args.negsamples = 20
+        args.epochs = 55
+        args.embed_size = 512
     experiment(args)

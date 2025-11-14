@@ -6,7 +6,7 @@ import sys
 import torch.nn as nn
 from utils import *
 from layers import MLP, SphericalMLP
-from transformers import BertModel, AutoModel
+from transformers import BertModel, AutoModel, DistilBertModel, DistilBertTokenizer
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 from vmf import VMFRegularisation
@@ -147,7 +147,11 @@ class PolarTaxo(nn.Module):
 
         loss_vmf, mu_p, mu_c, mu_n = self.vmf_regulariser(
             parent_sphere, child_sphere, negative_sphere, self.args.vmf_margin)
-        svgd_combined = SVGD_Combined_Sphere()
+
+        k_repel = self.args.kappa_repel
+        k_align = self.args.kappa_align
+        svgd_combined = SVGD_Combined_Sphere(
+            kappa_align=k_align, kappa_repel=k_repel)
         parent_svgd_grad = svgd_combined(parent_sphere, mu_p)
         child_svgd_grad = svgd_combined(child_sphere, mu_c)
         negative_svgd_grad = svgd_combined(negative_sphere, mu_n)
@@ -155,9 +159,9 @@ class PolarTaxo(nn.Module):
         taxo_loss = self.args.geometric_weight * \
             F.relu(welsch_cp-welsch_cn+self.args.beta).mean() + \
             (1-self.args.geometric_weight)*loss_vmf
-        svgd_loss = svgd_loss = parent_svgd_grad.norm(p=2, dim=1).mean() + \
+        svgd_loss = parent_svgd_grad.norm(p=2, dim=1).mean() + \
             child_svgd_grad.norm(p=2, dim=1).mean() + \
             negative_svgd_grad.norm(p=2, dim=1).mean()
-        final_loss = taxo_loss+0.1*svgd_loss
+        final_loss = taxo_loss+(self.args.svgd_weight*svgd_loss)
 
-        return final_loss
+        return final_loss, taxo_loss,svgd_loss

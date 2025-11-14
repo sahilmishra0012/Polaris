@@ -41,45 +41,6 @@ class SVGD_Combined_Sphere:
         return tangent_grad
 
 
-class SVGD_Uniform_Theta_Sphere:
-
-    def __init__(self, kappa=1.0, eps=1e-6):
-
-        self.kappa = kappa
-        self.eps = eps
-
-    def vmf_kernel(self, x, y):
-        dot_products = torch.matmul(x, y.t())
-        k = torch.exp(self.kappa * dot_products)
-        grad_k = self.kappa * k.unsqueeze(-1) * y.unsqueeze(0)
-        return k, grad_k
-
-    def score_fn(self, x):
-
-        score = torch.zeros_like(x)
-        x_d = x[:, -1]
-        score[:, -1] = x_d / (1 - x_d.pow(2) + self.eps)
-        return score
-
-    def __call__(self, x):
-
-        n_particles = x.size(0)
-
-        k, grad_k_repulsion = self.vmf_kernel(x, x)
-
-        repulsion = torch.sum(grad_k_repulsion, dim=1)
-
-        score = self.score_fn(x)
-        drift = torch.matmul(k, score)
-
-        svgd_grad = (drift + repulsion) / n_particles
-
-        tangent_grad = svgd_grad - \
-            (torch.sum(svgd_grad * x, dim=1, keepdim=True) * x)
-
-        return tangent_grad
-
-
 class SVGD_vMF_Sphere:
     def __init__(self, kappa=1):
 

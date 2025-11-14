@@ -235,7 +235,7 @@ class MAGDataset(object):
                 for node in self.taxonomy.nodes:
                     if self.taxonomy.out_degree(node) == 0:
                         leaf_node_ids.append(node.tx_id)
-                random.seed(20)
+                random.seed(40)
                 random.shuffle(leaf_node_ids)
 
                 validation_size = min(
@@ -457,5 +457,5 @@ class MAGDataset(object):
 
 
 if __name__ == '__main__':
-    MAGDataset(name='psychology', path="../data/psychology",
+    MAGDataset(name='computer_science', path="../data/computer_science",
                existing_partition=False, partition_pattern='leaf')

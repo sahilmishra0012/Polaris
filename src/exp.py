@@ -7,7 +7,7 @@ import sys
 import json
 from tqdm import tqdm
 from torch import optim
-from transformers import BertTokenizer, AutoTokenizer
+from transformers import BertTokenizer, AutoTokenizer, DistilBertTokenizer
 from utils import *
 from data import *
 from model import PolarTaxo
@@ -17,6 +17,7 @@ from matplotlib.patches import Ellipse
 from sklearn.decomposition import PCA
 import gc
 import seaborn as sns
+from hooks import GradientLogger
 import csv
 import wandb
 
@@ -40,18 +41,18 @@ class Experiments(object):
 
         self.optimizer = self._select_optimizer()
         self._set_device()
-        self.exp_setting = "_".join([str(elem) for elem in [self.args.pre_train, self.args.dataset, self.args.expID, self.args.epochs,
-                                    self.args.batch_size, self.args.beta, self.args.embed_size, self.args.geometric_weight, self.args.c, self.args.vmf_margin]])
-
-        setting = {
-            "dataset": self.args.dataset,
-            "expID": self.args.expID,
-            'beta': self.args.beta,
-            'embed_size': self.args.embed_size,
-            'seed': self.args.seed,
-            'c': self.args.c
-        }
-        print(setting)
+        self.exp_setting = "_".join([str(elem) for elem in [self.args.dataset, self.args.expID, self.args.epochs,
+                                    self.args.batch_size, self.args.beta, self.args.embed_size, self.args.geometric_weight, self.args.c, self.args.vmf_margin, self.args.kappa_repel, self.args.kappa_align]])
+        self.grad_logger = GradientLogger()
+        # setting = {
+        #     "dataset": self.args.dataset,
+        #     "expID": self.args.expID,
+        #     'beta': self.args.beta,
+        #     'embed_size': self.args.embed_size,
+        #     'seed': self.args.seed,
+        #     'c': self.args.c
+        # }
+        print(self.args)
 
     def __load_tokenizer__(self):
         if self.args.model == 'bert':
@@ -83,8 +84,18 @@ class Experiments(object):
 
         self.model.train()
 
-        loss = self.model(
+        loss, taxo_loss, svgd_loss = self.model(
             it, encode_parent, encode_child, encode_negative)
+        taxo_grads_to_log = None
+        if it == len(self.train_loader)-1:
+            # Calculate gradient norm for taxonomy and geometric loss
+            final_embedding_layers = [
+                ("par_projection.weight", self.model.parent_sphere.l2.weight),
+                ('child_projection.weight', self.model.child_sphere.l2.weight)
+            ]
+            self.grad_logger.log_gradients_for_layers(
+                taxo_loss, final_embedding_layers)
+            taxo_grads_to_log = self.grad_logger.get_loggable_dict()
 
         loss.backward()
 
@@ -98,7 +109,7 @@ class Experiments(object):
         torch.cuda.empty_cache()
         gc.collect()
 
-        return loss
+        return loss, svgd_loss, taxo_grads_to_log
 
     def train(self, checkpoint=None, save_path=None):
         time_tracker = []
@@ -109,8 +120,10 @@ class Experiments(object):
             self.model.load_state_dict(torch.load(f"{checkpoint}"))
 
         if save_path is None:
-            savedir = os.path.join("../result", self.args.dataset, "model")
-            traindir = os.path.join("../result", self.args.dataset, "train")
+            savedir = os.path.join(
+                "../result", self.args.dataset, "model", self.args.exp_name)
+            traindir = os.path.join(
+                "../result", self.args.dataset, "train", self.args.exp_name)
             if not os.path.exists(savedir):
                 os.makedirs(savedir, exist_ok=True)
             if not os.path.exists(traindir):
@@ -121,27 +134,29 @@ class Experiments(object):
         for epoch in tqdm(range(self.args.epochs)):
             epoch_time = time.time()
             train_loss = []
-            theta_train_loss = []
-            psi_train_loss = []
+            svgd_losses = []
 
             self.optimizer.zero_grad()
             for i, (encode_parent, encode_child, encode_negative) in tqdm(enumerate(self.train_loader), total=len(self.train_loader)):
-                loss = self.train_one_step(
+                loss, svgd_loss, taxo_grad_log = self.train_one_step(
                     it=i, encode_parent=encode_parent, encode_child=encode_child, encode_negative=encode_negative)
 
                 train_loss.append(loss.item())
+                svgd_losses.append(svgd_loss.item())
 
             train_loss = np.average(train_loss)
-            print("Theta Loss: ", theta_train_loss)
-            print("Psi Loss: ", psi_train_loss)
+            svgd_loss = np.average(svgd_losses)
             print("Loss: ", train_loss)
 
             test_metrics = self.predict()
             test_acc = test_metrics["Prec@1"]
             test_mrr = test_metrics["MRR"]
             if test_acc >= old_test_acc or test_mrr >= old_test_mrr:
-                torch.save(self.model.state_dict(
-                ), f"../final_result/{self.args.dataset}/experiment_{self.exp_setting}.pt")
+                final_res_dir = f"../final_result/{self.args.dataset}/{self.args.exp_name}"
+                if not os.path.exists(final_res_dir):
+                    os.makedirs(final_res_dir, exist_ok=True)
+                final_result_save_path = f"{final_res_dir}/experiment_{self.exp_setting}.pt"
+                torch.save(self.model.state_dict(), final_result_save_path)
                 old_test_acc = test_acc
                 old_test_mrr = test_mrr
                 old_test_wu_p = test_wu_p
@@ -165,6 +180,7 @@ class Experiments(object):
             if self.args.is_multi_parent is True and self.args.wandb == 1:
                 wandb.log({
                     'train_loss': (train_loss),
+                    'SVGD_Gradient_NORM': (svgd_loss),
                     'hit@1': (test_acc),
                     'mrr': (test_mrr),
                     'Recall@1': (test_metrics['Recall@1']),
@@ -185,8 +201,18 @@ class Experiments(object):
                     'mr': (test_metrics["MR"]),
                     'Wu&P': test_metrics['Wu'],
                 })
-            torch.save(self.model.state_dict(
-            ), f"../result/{self.args.dataset}/train/experiment_{self.exp_setting}.checkpoint")
+            torch.save(self.model.state_dict(), os.path.join(
+                traindir, f"experiment_{self.exp_setting}.checkpoint"))
+
+            # Log to wandb and keep a copy locally
+            # if taxo_grad_log is not None:
+            #     wandb.log(taxo_grad_log)
+
+            gradient_logs = f'../gradients/{self.args.dataset}/{self.args.exp_name}'
+            if not os.path.exists(gradient_logs):
+                os.makedirs(gradient_logs, exist_ok=True)
+            with open(f'{gradient_logs}/gradient.json', 'a+') as f:
+                json.dump(taxo_grad_log, f, indent=4)
 
     def get_pos_from_h_theta(self, h, theta):
 
@@ -290,7 +316,10 @@ class Experiments(object):
                       'Recall@5:{:.05f}'.format(test_metrics["Recall@5"]),
                       'Recall@10: {:.05f}'.format(test_metrics["Recall@10"]))
 
-        with open(f'../results/{self.args.dataset}/res_{self.exp_setting}.json', 'a+') as f:
+        results_json_dir = f'../results/{self.args.dataset}/{self.args.exp_name}'
+        if not os.path.exists(results_json_dir):
+            os.makedirs(results_json_dir, exist_ok=True)
+        with open(f'../results/{self.args.dataset}/{self.args.exp_name}/res_{self.exp_setting}.json', 'a+') as f:
             d = vars(self.args)
             expt_details = {
                 "Arguments": d,
@@ -369,9 +398,9 @@ class Experiments(object):
                 query_radius = candidate_depths+1
                 candidate_updated_radius = (
                     candidate_depths+1)+((torch.log1p(candidate_descendants))/torch.log(torch.tensor(2)))
-                query_radius_normalized = 1 - \
+                query_radius_normalized = 1 -\
                     ((query_radius-score_min)/(score_range))
-                candidate_radius_normalized = 1 - \
+                candidate_radius_normalized = 1 -\
                     ((candidate_updated_radius-score_min)/(score_range))
 
                 radius_diff = torch.abs(

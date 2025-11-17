@@ -86,6 +86,8 @@ parser.add_argument('--resume', type=str, default='no', help='Resume a run')
 parser.add_argument('--run_id', type=str, default='',
                     help='Wandb run id for resumption')
 parser.add_argument('--entity', type=str, default='uaena', help='wandb entity')
+parser.add_argument('--checkpoint_path', type=str,
+                    default=None, help='checkpoint path to resume training')
 
 start_time = time.time()
 print("Start time at : ")
@@ -132,7 +134,7 @@ def experiment(args):
     # args.expID = wandb.run
 
     exp = Experiments(args)
-    exp.train()
+    exp.train(checkpoint=args.checkpoint_path)
     """Train the model"""
 
     # exp.predict(tag="test")
@@ -149,16 +151,19 @@ def experiment(args):
 # Additional Config
 if __name__ == '__main__':
     args.gpu_id = 1
-    args.expID = 20
+    args.expID = 14
     args.batch_size = 512
-    args.accumulation_steps = 10
+    args.accumulation_steps = 5
     args.geometric_weight = 0.7
     args.c = 0.4
     args.vmf_margin = 0.3
-    args.dataset = 'mesh'
     args.svgd_weight = 0.1
     if args.dataset == 'mesh':
         args.negsamples = 20
-        args.epochs = 55
+        args.epochs = 80
         args.embed_size = 512
+    elif args.dataset == 'wordnet_verb':
+        args.negsamples = 20
+        args.epochs = 35
+        args.embed_size = 256
     experiment(args)

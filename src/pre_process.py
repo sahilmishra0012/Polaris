@@ -330,12 +330,16 @@ def pre_process_mag(args, outID=True):
     definitions_not_found_count = 0
 
     for cid, concept in id_concept.items():
-        concept_lower = concept.lower()
-        if concept_lower in def_dic:
-            id_context[cid] = f"{concept_lower}: {def_dic[concept_lower]}"
+        if args.dataset not in ['computer_science', 'psychology']:
+            concept_lower = concept.lower()
+            if concept_lower in def_dic:
+                id_context[cid] = f"{concept_lower}: {def_dic[concept_lower]}"
+            else:
+                id_context[cid] = f"{concept_lower}: {concept_lower}"
+                definitions_not_found_count += 1
         else:
-            id_context[cid] = f"{concept_lower}: {concept_lower}"
-            definitions_not_found_count += 1
+            concept_lower = concept.lower()
+            id_context[cid] = f"{concept_lower}"
 
     test_terms_file = os.path.join(
         f"../data/{dataset}/{dataset}_test.terms")

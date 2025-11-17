@@ -211,7 +211,7 @@ class Experiments(object):
             gradient_logs = f'../gradients/{self.args.dataset}/{self.args.exp_name}'
             if not os.path.exists(gradient_logs):
                 os.makedirs(gradient_logs, exist_ok=True)
-            with open(f'{gradient_logs}/gradient.json', 'a+') as f:
+            with open(f'{gradient_logs}/gradient_{self.exp_setting}.json', 'a+') as f:
                 json.dump(taxo_grad_log, f, indent=4)
 
     def get_pos_from_h_theta(self, h, theta):

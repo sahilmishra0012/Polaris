@@ -50,6 +50,11 @@ parser.add_argument('--geometric_weight', type=float,
                     default=0.5, help='Importance of Geometric Loss')
 parser.add_argument('--probabilistic_weight', type=float,
                     default=0.5, help='Importance of Probabilistic Loss')
+parser.add_argument(
+    '--svgd_weight', help='Importance of Svgd Loss', type=float)
+parser.add_argument('--kappa_align', help='Kappa Alignment', type=float)
+parser.add_argument('--kappa_repel', help='Kappa repulsion', type=float)
+parser.add_argument('--svgd_kernel', help='SVGD kernel')
 
 
 # Others
@@ -83,7 +88,7 @@ print(args)
 # create_mag_data(args)
 exp = Experiments(args)
 exp.visualize_angle_distributions(
-    tag='test', path='/home/nitish/Polartaxo/result/mesh/train/experiment_bert_mesh_13_55_512_0.5_256_0.7_0.4_0.5.checkpoint')
+    tag='test', path='/home/nitish/Polartaxo/final_result/mesh/svgd_kappa_align_repel/experiment_mesh_14_80_512_0.5_512_0.7_0.4_0.3_0.0_0.0.pt')
 # exp.level_wise_prediction(
 #     tag='test', path='/home/nitish/Polartaxo/result/mesh/train/experiment_3_varied_geometric_weight/experiment_bert_mesh_2_60_1024_0.5_128_0.5_0.5.')
 # exp.predict(tag='test', path='/home/nitish/Polartaxo/result/mesh/train/experiment_3_varied_geometric_weight/experiment_bert_mesh_2_60_1024_0.5_128_0.8_0.5.')

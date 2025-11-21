@@ -152,9 +152,15 @@ class PolarTaxo(nn.Module):
         k_align = self.args.kappa_align
         svgd_combined = SVGD_Combined_Sphere(
             kappa_align=k_align, kappa_repel=k_repel)
-        parent_svgd_grad = svgd_combined(parent_sphere, mu_p)
-        child_svgd_grad = svgd_combined(child_sphere, mu_c)
-        negative_svgd_grad = svgd_combined(negative_sphere, mu_n)
+        if self.args.experiment_setting == 'constant_svgd':
+            parent_svgd_grad = svgd_combined(parent_sphere, parent_sphere)
+            child_svgd_grad = svgd_combined(child_sphere, child_sphere)
+            negative_svgd_grad = svgd_combined(
+                negative_sphere, negative_sphere)
+        else:
+            parent_svgd_grad = svgd_combined(parent_sphere, mu_p)
+            child_svgd_grad = svgd_combined(child_sphere, mu_c)
+            negative_svgd_grad = svgd_combined(negative_sphere, mu_n)
 
         taxo_loss = self.args.geometric_weight * \
             F.relu(welsch_cp-welsch_cn+self.args.beta).mean() + \
@@ -164,4 +170,4 @@ class PolarTaxo(nn.Module):
             negative_svgd_grad.norm(p=2, dim=1).mean()
         final_loss = taxo_loss+(self.args.svgd_weight*svgd_loss)
 
-        return final_loss, taxo_loss,svgd_loss
+        return final_loss, taxo_loss, svgd_loss

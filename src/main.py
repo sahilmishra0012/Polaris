@@ -88,6 +88,8 @@ parser.add_argument('--run_id', type=str, default='',
 parser.add_argument('--entity', type=str, default='uaena', help='wandb entity')
 parser.add_argument('--checkpoint_path', type=str,
                     default=None, help='checkpoint path to resume training')
+parser.add_argument('--experiment_setting', type=str,
+                    default='standard', help='experiment setting for SVGD')
 
 start_time = time.time()
 print("Start time at : ")
@@ -160,7 +162,7 @@ if __name__ == '__main__':
     args.svgd_weight = 0.1
     if args.dataset == 'mesh':
         args.negsamples = 20
-        args.epochs = 80
+        args.epochs = 55
         args.embed_size = 512
     elif args.dataset == 'wordnet_verb':
         args.negsamples = 20

@@ -88,7 +88,7 @@ print(args)
 # create_mag_data(args)
 exp = Experiments(args)
 exp.visualize_angle_distributions(
-    tag='test', path='/home/nitish/Polartaxo/final_result/mesh/svgd_kappa_align_repel/experiment_mesh_14_80_512_0.5_512_0.7_0.4_0.3_0.0_0.0.pt')
+    tag='test', path='/home/nitish/Polartaxo/result/wordnet_verb/train/svgd_kappa_align_repel/experiment_wordnet_verb_14_35_512_0.5_256_0.7_0.4_0.3_0.0_0.0.checkpoint')
 # exp.level_wise_prediction(
 #     tag='test', path='/home/nitish/Polartaxo/result/mesh/train/experiment_3_varied_geometric_weight/experiment_bert_mesh_2_60_1024_0.5_128_0.5_0.5.')
 # exp.predict(tag='test', path='/home/nitish/Polartaxo/result/mesh/train/experiment_3_varied_geometric_weight/experiment_bert_mesh_2_60_1024_0.5_128_0.8_0.5.')

@@ -7,7 +7,6 @@ from utils import *
 from exp import Experiments
 import torch.multiprocessing as tmp
 from utils import print_local_time, set_seed
-from svgd import SVGD_Uniform_Sphere
 import wandb
 
 os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
@@ -67,9 +66,10 @@ parser.add_argument('--probabilistic_weight', type=float,
                     default=0.5, help='Importance of Probabilistic Loss')
 parser.add_argument(
     '--svgd_weight', help='Importance of Svgd Loss', type=float)
-parser.add_argument('--kappa_align', help='Kappa Alignment', type=float)
-parser.add_argument('--kappa_repel', help='Kappa repulsion', type=float)
-parser.add_argument('--svgd_kernel', help='SVGD kernel')
+parser.add_argument('--kappa_align', help='Kappa Alignment',
+                    type=float, default=2.5)
+parser.add_argument('--kappa_repel', help='Kappa repulsion',
+                    type=float, default=4.5)
 
 # Others
 parser.add_argument('--cuda', type=bool, default=True,
@@ -90,6 +90,9 @@ parser.add_argument('--checkpoint_path', type=str,
                     default=None, help='checkpoint path to resume training')
 parser.add_argument('--experiment_setting', type=str,
                     default='standard', help='experiment setting for SVGD')
+parser.add_argument('--kernel_setting', type=str,
+                    default='vmf_theta', help='kernel setting for SVGD')
+
 
 start_time = time.time()
 print("Start time at : ")
@@ -162,7 +165,7 @@ if __name__ == '__main__':
     args.svgd_weight = 0.1
     if args.dataset == 'mesh':
         args.negsamples = 20
-        args.epochs = 55
+        args.epochs = 45
         args.embed_size = 512
     elif args.dataset == 'wordnet_verb':
         args.negsamples = 20

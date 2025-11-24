@@ -238,4 +238,4 @@ class SphericalProjectionHead(nn.Module):
         theta, psi = self.differentiable_cartesian_to_polar(
             cartesian_unit_vectors)
 
-        return
+        return theta, psi

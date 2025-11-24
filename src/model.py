@@ -150,17 +150,40 @@ class PolarTaxo(nn.Module):
 
         k_repel = self.args.kappa_repel
         k_align = self.args.kappa_align
-        svgd_combined = SVGD_Combined_Sphere(
-            kappa_align=k_align, kappa_repel=k_repel)
-        if self.args.experiment_setting == 'constant_svgd':
-            parent_svgd_grad = svgd_combined(parent_sphere, parent_sphere)
-            child_svgd_grad = svgd_combined(child_sphere, child_sphere)
-            negative_svgd_grad = svgd_combined(
-                negative_sphere, negative_sphere)
-        else:
-            parent_svgd_grad = svgd_combined(parent_sphere, mu_p)
-            child_svgd_grad = svgd_combined(child_sphere, mu_c)
-            negative_svgd_grad = svgd_combined(negative_sphere, mu_n)
+
+        if self.args.kernel_setting == 'radial':
+            svgd_combined = SVGD_Uniform_Sphere()
+
+            parent_svgd_grad = svgd_combined(parent_sphere)
+            child_svgd_grad = svgd_combined(child_sphere)
+            negative_svgd_grad = svgd_combined(negative_sphere)
+
+        elif self.args.kernel_setting == 'vmf':
+            svgd_combined = SVGD_vMF_Sphere()
+
+            parent_svgd_grad = svgd_combined(parent_sphere)
+            child_svgd_grad = svgd_combined(child_sphere)
+            negative_svgd_grad = svgd_combined(negative_sphere)
+
+        elif self.args.kernel_setting == 'imq':
+            svgd_combined = SVGD_IMQ_Sphere()
+
+            parent_svgd_grad = svgd_combined(parent_sphere)
+            child_svgd_grad = svgd_combined(child_sphere)
+            negative_svgd_grad = svgd_combined(negative_sphere)
+
+        elif self.args.kernel_setting == 'vmf_theta':
+            svgd_combined = SVGD_Combined_Sphere(
+                kappa_align=k_align, kappa_repel=k_repel)
+            if self.args.experiment_setting == 'constant_svgd':
+                parent_svgd_grad = svgd_combined(parent_sphere, parent_sphere)
+                child_svgd_grad = svgd_combined(child_sphere, child_sphere)
+                negative_svgd_grad = svgd_combined(
+                    negative_sphere, negative_sphere)
+            else:
+                parent_svgd_grad = svgd_combined(parent_sphere, mu_p)
+                child_svgd_grad = svgd_combined(child_sphere, mu_c)
+                negative_svgd_grad = svgd_combined(negative_sphere, mu_n)
 
         taxo_loss = self.args.geometric_weight * \
             F.relu(welsch_cp-welsch_cn+self.args.beta).mean() + \

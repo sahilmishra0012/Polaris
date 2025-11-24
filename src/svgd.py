@@ -68,17 +68,15 @@ class SVGD_vMF_Sphere:
 
 
 class SVGD_Uniform_Sphere:
-    def __init__(self, n_particles, dim, bandwidth=1.0):
-        self.n_particles = n_particles
-        self.dim = dim
+    def __init__(self, bandwidth=1.0):
         self.bandwidth = bandwidth
 
     def rbf_kernel(self, x):
 
         sq_dist = torch.cdist(x, x, p=2)**2
-        h = sq_dist.median() / (2 * torch.log(torch.tensor(self.n_particles, dtype=torch.float)))
+        h = sq_dist.median() / (2 * torch.log(torch.tensor(x.size(0), dtype=torch.float)))
         h = torch.sqrt(
-            0.5 * h / torch.log(torch.tensor(self.n_particles + 1., dtype=torch.float)))
+            0.5 * h / torch.log(torch.tensor(x.size(0) + 1., dtype=torch.float)))
 
         k = torch.exp(-sq_dist / h**2 / 2)
         grad_k = -torch.einsum('ij, ik -> ijk', k, x) / (h**2)
@@ -91,7 +89,39 @@ class SVGD_Uniform_Sphere:
         k, grad_k = self.rbf_kernel(x)
 
         svgd_grad = torch.sum(k.unsqueeze(-1) * grad_k,
-                              dim=1) / self.n_particles
+                              dim=1) / x.size(0)
+
+        tangent_grad = svgd_grad - \
+            (torch.sum(svgd_grad * x, dim=1, keepdim=True) * x)
+
+        return tangent_grad
+
+
+class SVGD_IMQ_Sphere:
+    def __init__(self, c=1.0, beta=-0.5):
+        self.c = c
+        self.beta = beta
+
+    def imq_kernel(self, x, y):
+
+        dot_products = torch.matmul(x, y.t())
+
+        base = self.c + 2.0 - 2.0 * dot_products
+
+        k = base.pow(self.beta)
+
+        k_grad_coeff = -2.0 * self.beta * base.pow(self.beta - 1.0)
+
+        grad_k = k_grad_coeff.unsqueeze(-1) * y.unsqueeze(0)
+
+        return k, grad_k
+
+    def __call__(self, x):
+        n_particles = x.size(0)
+
+        k, grad_k = self.imq_kernel(x, x)
+
+        svgd_grad = torch.sum(grad_k, dim=1) / n_particles
 
         tangent_grad = svgd_grad - \
             (torch.sum(svgd_grad * x, dim=1, keepdim=True) * x)

@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 import random
+import csv
 import networkx as nx
 import helpers
 import pdb
@@ -9,6 +10,7 @@ from itertools import product, chain, combinations
 import datetime
 from collections import defaultdict
 from tqdm import tqdm
+from sklearn.model_selection import train_test_split
 import copy
 from collections import deque
 import sys
@@ -123,6 +125,40 @@ class MAGDatasetCorrected(object):
         with open(f"../data/{self.name}/{self.name}_test.taxo", "w") as f:
             for u, v in self.test_edges:
                 f.write(f"{u.tx_id}\t{v.tx_id}\n")
+
+
+class BirdsImagesDataset(object):
+    def __init__(self, edges_path):
+        self.edges_path = edges_path
+        self.test_ratio = 0.20
+
+        self.perform_edges_split()
+
+    def perform_edges_split(self):
+
+        edges = list()
+        with open(self.edges_path, 'r', newline='', encoding='utf-8') as f:
+            reader = csv.reader(f, delimiter='\t')
+            for row in reader:
+                edges.append(row)
+
+        print("Splitting edges...")
+        train_edges, test_edges = train_test_split(
+            edges, test_size=self.test_ratio)
+
+        print("Saving train edges...")
+        with open('../data/birds/birds_train.taxo', 'w', newline='') as f:
+            writer = csv.writer(f, delimiter='\t')
+
+            for train_edge in train_edges:
+                writer.writerow(train_edge)
+
+        print("Saving test edges...")
+        with open('../data/birds/birds_test.taxo', 'w', newline='') as f:
+            writer = csv.writer(f, delimiter='\t')
+
+            for test_edge in test_edges:
+                writer.writerow(test_edge)
 
 
 class MAGDataset(object):
@@ -457,5 +493,7 @@ class MAGDataset(object):
 
 
 if __name__ == '__main__':
-    MAGDataset(name='computer_science', path="../data/computer_science",
-               existing_partition=False, partition_pattern='leaf')
+    # MAGDataset(name='computer_science', path="../data/computer_science",
+    #            existing_partition=False, partition_pattern='leaf')
+    # BirdsImagesDataset(
+    #     edges_path='/home/nitish/Polartaxo/data/birds/birds.taxo')

@@ -42,7 +42,7 @@ class Experiments(object):
         self.optimizer = self._select_optimizer()
         self._set_device()
         self.exp_setting = "_".join([str(elem) for elem in [self.args.dataset, self.args.expID, self.args.epochs,
-                                    self.args.batch_size, self.args.beta, self.args.embed_size, self.args.geometric_weight, self.args.c, self.args.vmf_margin, self.args.kappa_repel, self.args.kappa_align]])
+                                    self.args.batch_size, self.args.beta, self.args.embed_size, self.args.geometric_weight, self.args.c, self.args.vmf_margin, self.args.kappa_repel, self.args.kappa_align, self.args.kernel_setting, self.args.svgd_weight]])
         self.grad_logger = GradientLogger()
         # setting = {
         #     "dataset": self.args.dataset,

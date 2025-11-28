@@ -24,8 +24,8 @@ class PolarTaxo(nn.Module):
         self.pre_train_model = self.__load_pre_trained__()
 
         # Spherical
-        self.vmf_regulariser = VMFRegularisation(
-            embedding_dim=self.args.embed_size, hidden_dim=self.args.hidden)
+        self.vmf_regulariser = VMFRegularisation(args=self.args,
+                                                 embedding_dim=self.args.embed_size, hidden_dim=self.args.hidden)
         self.child_sphere = SphericalMLP(
             input_dim=768, hidden=self.args.hidden, output_dim=self.args.embed_size, bias=False)
         self.parent_sphere = SphericalMLP(

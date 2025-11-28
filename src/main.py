@@ -92,6 +92,8 @@ parser.add_argument('--experiment_setting', type=str,
                     default='standard', help='experiment setting for SVGD')
 parser.add_argument('--kernel_setting', type=str,
                     default='vmf_theta', help='kernel setting for SVGD')
+parser.add_argument('--learn_mu', type=int, default=1,
+                    help='If mu needs to be learnt during training')
 
 
 start_time = time.time()
@@ -165,10 +167,10 @@ if __name__ == '__main__':
     args.svgd_weight = 0.1
     if args.dataset == 'mesh':
         args.negsamples = 20
-        args.epochs = 45
+        args.epochs = 50
         args.embed_size = 512
     elif args.dataset == 'wordnet_verb':
         args.negsamples = 20
-        args.epochs = 35
+        args.epochs = 30
         args.embed_size = 256
     experiment(args)

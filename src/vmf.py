@@ -49,7 +49,7 @@ def vmf_kl_divergence(mu1, kappa1, mu2, kappa2, dim):
 
 
 class VMFRegularisation(nn.Module):
-    def __init__(self, embedding_dim, hidden_dim=64):
+    def __init__(self, args, embedding_dim, hidden_dim=64):
         super(VMFRegularisation, self).__init__()
 
         self.embedding_dim = embedding_dim
@@ -57,10 +57,16 @@ class VMFRegularisation(nn.Module):
             embedding_dim, hidden_dim), nn.ReLU(), nn.Linear(hidden_dim, 1), nn.Softplus())
         self.mu_predictor = nn.Sequential(SphericalLinear(
             embedding_dim, hidden_dim), SphericalTanh(), SphericalLinear(hidden_dim, embedding_dim))
+        self.args = args
 
     def forward(self, p_emb, c_emb, n_emb, margin):
-        mu_p, mu_c, mu_n = self.mu_predictor(
-            p_emb), self.mu_predictor(c_emb), self.mu_predictor(n_emb)
+        if self.args.learn_mu == 0:
+            mu_p = p_emb
+            mu_c = c_emb
+            mu_n = n_emb
+        else:
+            mu_p, mu_c, mu_n = self.mu_predictor(
+                p_emb), self.mu_predictor(c_emb), self.mu_predictor(n_emb)
         kappa_p = self.kappa_predictor(p_emb)
         kappa_c = self.kappa_predictor(c_emb)
         kappa_n = self.kappa_predictor(n_emb)

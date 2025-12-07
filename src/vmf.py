@@ -64,12 +64,22 @@ class VMFRegularisation(nn.Module):
             mu_p = p_emb
             mu_c = c_emb
             mu_n = n_emb
+
+            kappa_p = self.kappa_predictor(p_emb)
+            kappa_c = self.kappa_predictor(c_emb)
+            kappa_n = self.kappa_predictor(n_emb)
+        elif self.args.learn_kappa == 0:
+            mu_p, mu_c, mu_n = self.mu_predictor(
+                p_emb), self.mu_predictor(c_emb), self.mu_predictor(n_emb)
+            kappa_p = torch.tensor(0.4)
+            kappa_c = torch.tensor(0.4)
+            kappa_n = torch.tensor(0.4)
         else:
             mu_p, mu_c, mu_n = self.mu_predictor(
                 p_emb), self.mu_predictor(c_emb), self.mu_predictor(n_emb)
-        kappa_p = self.kappa_predictor(p_emb)
-        kappa_c = self.kappa_predictor(c_emb)
-        kappa_n = self.kappa_predictor(n_emb)
+            kappa_p = self.kappa_predictor(p_emb)
+            kappa_c = self.kappa_predictor(c_emb)
+            kappa_n = self.kappa_predictor(n_emb)
         kl_pos = vmf_kl_divergence(
             mu_c, kappa_c, mu_p, kappa_p, self.embedding_dim)
         kl_neg = vmf_kl_divergence(

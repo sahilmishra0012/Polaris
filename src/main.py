@@ -93,7 +93,9 @@ parser.add_argument('--experiment_setting', type=str,
 parser.add_argument('--kernel_setting', type=str,
                     default='vmf_theta', help='kernel setting for SVGD')
 parser.add_argument('--learn_mu', type=int, default=1,
-                    help='If mu needs to be learnt during training')
+                    help='If mu needs to be learned during training')
+parser.add_argument('--learn_kappa', type=int, default=1,
+                    help='If kappa parameter of VMF needs to be learned during training')
 
 
 start_time = time.time()
@@ -157,7 +159,7 @@ def experiment(args):
 
 # Additional Config
 if __name__ == '__main__':
-    args.gpu_id = 1
+    args.gpu_id = 2
     args.expID = 14
     args.batch_size = 512
     args.accumulation_steps = 5

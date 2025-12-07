@@ -492,8 +492,8 @@ class MAGDataset(object):
             f.write(f"{'root'}\t{'root'}\n")
 
 
-if __name__ == '__main__':
-    # MAGDataset(name='computer_science', path="../data/computer_science",
-    #            existing_partition=False, partition_pattern='leaf')
-    # BirdsImagesDataset(
-    #     edges_path='/home/nitish/Polartaxo/data/birds/birds.taxo')
+# if __name__ == '__main__':
+#     # MAGDataset(name='computer_science', path="../data/computer_science",
+#     #            existing_partition=False, partition_pattern='leaf')
+#     # BirdsImagesDataset(
+#     #     edges_path='/home/nitish/Polartaxo/data/birds/birds.taxo')

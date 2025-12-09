@@ -453,6 +453,244 @@ def pre_process_mag(args, outID=True):
         child_neg_parent_pair, val_concepts_ids, val_gts_ids, test_concepts_ids, test_gts_ids, normalized_radii
     )
 
+# Parents are image paths and children are the labels. Dataset structured as a forest.
+
+
+def pre_process_images(args, outID=True):
+    print("Processing Birds dataset...")
+    dataset = 'birds'
+    negsamples = args.negsamples
+
+    def load_file(filepath):
+        try:
+            with open(filepath, 'r') as f:
+                return f.readlines()
+        except FileNotFoundError:
+            raise FileNotFoundError(f"File not found: {filepath}")
+
+    def process_pair(pair):
+        ids = pair.strip().split()
+        return (ids[0], ids[1])
+
+    # 0 represents the image path and 1 represents the label
+    taxonomy_file = os.path.join(f"../data/{dataset}/{dataset}.taxo")
+    full_taxonomy_pairs = load_file(taxonomy_file)
+
+    all_concept_set_str = set([])
+    all_taxo_dict_str = collections.defaultdict(list)
+
+    for pair in full_taxonomy_pairs:
+        parent, child = process_pair(pair)
+        all_concept_set_str.add(child)
+        all_concept_set_str.add(parent)
+
+        all_taxo_dict_str[parent].append(child)
+
+    concepts = sorted(all_concept_set_str)
+    concept_id = {concept: idx for idx, concept in enumerate(concepts)}
+    id_concept = {idx: concept for idx, concept in enumerate(concepts)}
+
+    all_taxo_dict = collections.defaultdict(list)
+    all_taxo_dict_reverse = collections.defaultdict(list)
+
+    all_kids = list()
+
+    if outID:
+        concept_set = set(concept_id.values())
+        for parent_str, children_str in all_taxo_dict_str.items():
+            parent_id = concept_id[parent_str]
+            children_ids = [concept_id[c] for c in children_str]
+            all_kids.extend(children_ids)
+            all_taxo_dict[parent_id].extend(children_ids)
+
+            for child_id in children_ids:
+                all_taxo_dict_reverse[child_id].append(parent_id)
+    else:
+        concept_set = all_concept_set_str
+        all_taxo_dict = all_taxo_dict_str
+
+    print(f"Loaded {len(concept_set)} total image paths and labels")
+    train_taxonomy_file = os.path.join(
+        f"../data/{dataset}/{dataset}_train.taxo")
+    train_taxonomy_pairs = load_file(train_taxonomy_file)
+
+    parent_list, child_list = [], []
+    train_concept_set = set()
+
+    chd2par_dict = collections.defaultdict(set)
+    taxo_dict = collections.defaultdict(list)
+    taxo_edges = []
+
+    print("Processing training data....")
+
+    for pair in train_taxonomy_pairs:
+        parent, child = process_pair(pair)
+
+        if outID:
+            parent, child = concept_id[parent], concept_id[child]
+
+        parent_list.append(parent)
+        child_list.append(child)
+        train_concept_set.add(parent)
+        train_concept_set.add(child)
+
+        chd2par_dict[child].add(parent)
+        taxo_dict[parent].append(child)
+
+        taxo_edges.append((parent, child))
+
+    all_children = set(all_kids)
+    roots = concept_set-all_children
+
+    print(f"Found {len(taxo_edges)} training samples... ")
+    print(f"Found {len(roots)} roots in the training tree...")
+
+    print("Calculating radii based on depth and descendants using single-step normalization...")
+    all_children_nodes = {child for parent,
+                          children in all_taxo_dict.items() for child in children}
+    roots = concept_set - all_children_nodes
+    print(f"Found {len(roots)} root nodes for depth calculation.")
+
+    queue = deque([(root, 1) for root in roots])
+    visited_for_depth = set(roots)
+    depths = {}
+    for root in roots:
+        depths[root] = 1
+
+    while queue:
+        current_node, current_depth = queue.popleft()
+        children = all_taxo_dict.get(current_node, [])
+        for child in children:
+            if child not in visited_for_depth:
+                visited_for_depth.add(child)
+                depths[child] = current_depth+1
+                queue.append((child, current_depth+1))
+    print("Node depth calculation completed.....")
+
+    memo = {}
+
+    def get_all_descendants(start_node):
+        if start_node in memo:
+            return memo[start_node]
+        descendants = set()
+        queue = deque(all_taxo_dict.get(start_node, []))
+        visited = set(queue)
+        while queue:
+            current_node = queue.popleft()
+            descendants.add(current_node)
+            children = all_taxo_dict.get(current_node, [])
+            for c in children:
+                if c not in visited:
+                    visited.add(c)
+                    queue.append(c)
+        memo[start_node] = descendants
+        return descendants
+
+    raw_scores = {}
+    for node in tqdm(concept_set, desc="Calculating raw scores (h + log(l+1))"):
+        h = depths.get(node, 1)
+        l = len(get_all_descendants(node))
+        raw_scores[node] = h + (np.log1p(l)/np.log(2))
+
+    all_raw_values = list(raw_scores.values())
+    raw_score_min = min(all_raw_values)
+    raw_score_max = max(all_raw_values)
+    raw_score_range = raw_score_max - \
+        raw_score_min if raw_score_max > raw_score_min else 1.0
+
+    normalized_radii = {
+        node: {'radii': 1.0 - ((score - raw_score_min) / raw_score_range),
+               'depth': depths.get(node),
+               'descendents': len(get_all_descendants(node)),
+               'raw_score_min': raw_score_min,
+               'raw_score_range': raw_score_range,
+               }
+        for node, score in raw_scores.items()
+    }
+
+    print("Normalization radii calculation completed for images....")
+
+    id_context = id_concept
+    print("Processing test split....")
+
+    test_file = os.path.join(f"../data/{dataset}/{dataset}_test.taxo")
+    test_term_lines = load_file(test_file)
+
+    def get_eval_data(lines):
+        concept_ids, gts_ids = [], []
+        for line in lines:
+            _, child_term = line.strip().split("\t")
+        parent_ids = list()
+
+        if child_term in concept_id:
+            child_id = concept_id[child_term]
+            parent_terms = all_taxo_dict_reverse.get(child_term, [])
+
+            for p in parent_terms:
+                if p in concept_id:
+                    parent_ids.append(concept_id[p])
+            concept_ids.append(child_id)
+            gts_ids.append(parent_ids)
+        else:
+            print(
+                f"Found invalid label {child_term} since it doesnt have an associated image..removing from test set")
+
+        return concept_ids, gts_ids
+
+    # Keeping empty for consistency purposes. there is no validation split for this dataset
+    val_concepts_ids, val_gts_ids = [], []
+    test_concepts_ids, test_gts_ids = get_eval_data(test_term_lines)
+
+    sampled_negative_parent_dict = {}
+    negative_parent_list = []
+
+    child_parent_pair = [[child, parent]
+                         for child, parent in zip(child_list, parent_list)]
+
+    training_triplets = list()
+    count_fallback_samples = 0
+    print(
+        f"There are {len(child_parent_pair)} training pairs in the training set.")
+
+    for child_id, parent_id in tqdm(child_parent_pair, desc="Generating (c, p, n) Triplets"):
+
+        found_negatives = list()
+        random_negative = np.random.choice(list(train_concept_set))
+
+        if (random_negative != child_id and
+            random_negative != parent_id and
+            random_negative not in chd2par_dict[child_id] and
+                random_negative not in found_negatives):
+            found_negatives.append(random_negative)
+            count_fallback_samples += 1
+
+        for neg_id in found_negatives:
+            training_triplets.append((child_id, parent_id, neg_id))
+
+    child_neg_parent_pair = []
+    print("Negative sampling done!!!")
+    print(
+        f"Used random negative sampling for {count_fallback_samples} samples.")
+
+    child_parent_negative_parent_triple = training_triplets
+    print(
+        f"There are {len(child_parent_negative_parent_triple)} samples for training.")
+    print(
+        f"There are {len(test_concepts_ids)} test concepts with {len(test_gts_ids)} ground truth mappings.")
+
+    path2root = collections.defaultdict(list)
+    print("Preprocessing complete.")
+
+    with open(f'../levels/{args.dataset}_levels.json', 'w') as f:
+        json.dump(normalized_radii, f, indent=4)
+
+    return (
+        concept_set, concept_id, id_concept, id_context, train_concept_set, taxo_dict,
+        sampled_negative_parent_dict, child_parent_negative_parent_triple, parent_list, child_list,
+        negative_parent_list, all_taxo_dict, path2root, child_parent_pair,
+        child_neg_parent_pair, val_concepts_ids, val_gts_ids, test_concepts_ids, test_gts_ids, normalized_radii
+    )
+
 
 def preprocess(args, outID=True):
     """
@@ -643,6 +881,45 @@ def preprocess(args, outID=True):
         test_gt_id, all_taxo_dict, path2root, sib_pair, child_parent_pair, child_neg_parent_pair,
         child_sibling_pair, val_concept, val_gt, test_concept, test_gt
     )
+
+
+def create_image_data(args):
+    print("Waiting for preprocess image data consisting of paths and labels...")
+    concept_set, concept_id, id_concept, id_context, train_concept_set, taxo_dict, negative_parent_dict, child_parent_negative_parent_triple, parent_list, child_list, negative_parent_list, all_taxo_dict, path2root, child_parent_pair, child_neg_parent_pair, val_concept, val_gt, test_concepts_id, test_gt, node_levels = pre_process_images(
+        args)
+    save_data = {
+        "concept_set": concept_set,
+        "concept2id": concept_id,
+        "id2concept": id_concept,
+        "id2context": id_context,
+        "train_concept_set": train_concept_set,
+        "train_taxo_dict": taxo_dict,
+        "all_taxo_dict": all_taxo_dict,
+        "train_negative_parent_dict": negative_parent_dict,
+        "train_child_parent_negative_parent_triple": child_parent_negative_parent_triple,
+        "train_parent_list": parent_list,
+        "train_child_list": child_list,
+        "train_negative_parent_list": negative_parent_list,
+        "test_concepts_id": test_concepts_id,
+        "test_gt_id": test_gt,
+        "path2root": path2root,
+        "child_parent_pair": child_parent_pair,
+        "child_neg_parent_pair": child_neg_parent_pair,
+        "val_concept": val_concept,
+        "val_gt": val_gt,
+        "test_concept": test_concepts_id,
+        "test_gt": test_gt,
+        "node_levels": node_levels
+    }
+
+    with open("../data/"+str(args.dataset)+"/processed/taxonomy_data_"+str(args.expID)+str(args.negsamples)+"_.pkl", "wb") as f:
+        pkl.dump(save_data, f)
+
+    print("Waiting for saving processed data....")
+    print("Done!")
+    print(
+        f"From processed data, there are :{len(child_parent_negative_parent_triple)} training instances")
+    print(f"From processed data, there are :{len(test_gt)} test instances")
 
 
 def create_mag_data(args):

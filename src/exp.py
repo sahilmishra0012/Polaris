@@ -31,10 +31,18 @@ class Experiments(object):
 
         self.args = args
         self.tokenizer = self.__load_tokenizer__()
-        self.train_loader, self.train_set = load_data(
-            self.args, self.tokenizer, "train")
-        self.test_loader, self.test_set = load_data(
-            self.args, self.tokenizer, "test")
+
+        if self.args.dataset != 'birds':
+            self.train_loader, self.train_set = load_data(
+                self.args, self.tokenizer, "train")
+            self.test_loader, self.test_set = load_data(
+                self.args, self.tokenizer, "test")
+        else:
+            # Tokenizer loaded in the dataset class for multimodal experiments.
+            self.train_loader, self.train_set = load_data(
+                args, None, flag='train')
+            self.test_loader, self.test_set = load_data(
+                args, None, flag='test')
         self.accumulation_steps = self.args.accumulation_steps
 
         self.model = PolarTaxo(args)

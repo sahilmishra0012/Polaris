@@ -470,15 +470,17 @@ def pre_process_images(args, outID=True):
 
     def process_pair(pair):
         ids = pair.strip().split()
-        return (ids[0], ids[1])
+        return (ids[1], ids[0])
 
     # 0 represents the image path and 1 represents the label
+    # Parent is the label and child is the image. This structure aligns image with label.
     taxonomy_file = os.path.join(f"../data/{dataset}/{dataset}.taxo")
     full_taxonomy_pairs = load_file(taxonomy_file)
 
     all_concept_set_str = set([])
     all_taxo_dict_str = collections.defaultdict(list)
 
+    all_labels_set = set()
     for pair in full_taxonomy_pairs:
         parent, child = process_pair(pair)
         all_concept_set_str.add(child)
@@ -489,6 +491,11 @@ def pre_process_images(args, outID=True):
     concepts = sorted(all_concept_set_str)
     concept_id = {concept: idx for idx, concept in enumerate(concepts)}
     id_concept = {idx: concept for idx, concept in enumerate(concepts)}
+
+    for c in concepts:
+        if c.startswith('/'):
+            continue
+        all_labels_set.add(c)
 
     all_taxo_dict = collections.defaultdict(list)
     all_taxo_dict_reverse = collections.defaultdict(list)
@@ -633,7 +640,7 @@ def pre_process_images(args, outID=True):
             gts_ids.append(parent_ids)
         else:
             print(
-                f"Found invalid label {child_term} since it doesnt have an associated image..removing from test set")
+                f"Found invalid label {child_term} since it doesnt have an associated label..removing from test set")
 
         return concept_ids, gts_ids
 
@@ -688,7 +695,7 @@ def pre_process_images(args, outID=True):
         concept_set, concept_id, id_concept, id_context, train_concept_set, taxo_dict,
         sampled_negative_parent_dict, child_parent_negative_parent_triple, parent_list, child_list,
         negative_parent_list, all_taxo_dict, path2root, child_parent_pair,
-        child_neg_parent_pair, val_concepts_ids, val_gts_ids, test_concepts_ids, test_gts_ids, normalized_radii
+        child_neg_parent_pair, val_concepts_ids, val_gts_ids, test_concepts_ids, test_gts_ids, normalized_radii, all_labels_set
     )
 
 
@@ -885,7 +892,7 @@ def preprocess(args, outID=True):
 
 def create_image_data(args):
     print("Waiting for preprocess image data consisting of paths and labels...")
-    concept_set, concept_id, id_concept, id_context, train_concept_set, taxo_dict, negative_parent_dict, child_parent_negative_parent_triple, parent_list, child_list, negative_parent_list, all_taxo_dict, path2root, child_parent_pair, child_neg_parent_pair, val_concept, val_gt, test_concepts_id, test_gt, node_levels = pre_process_images(
+    concept_set, concept_id, id_concept, id_context, train_concept_set, taxo_dict, negative_parent_dict, child_parent_negative_parent_triple, parent_list, child_list, negative_parent_list, all_taxo_dict, path2root, child_parent_pair, child_neg_parent_pair, val_concept, val_gt, test_concepts_id, test_gt, node_levels, all_labels_set = pre_process_images(
         args)
     save_data = {
         "concept_set": concept_set,
@@ -909,7 +916,8 @@ def create_image_data(args):
         "val_gt": val_gt,
         "test_concept": test_concepts_id,
         "test_gt": test_gt,
-        "node_levels": node_levels
+        "node_levels": node_levels,
+        "all_labels_set": all_labels_set
     }
 
     with open("../data/"+str(args.dataset)+"/processed/taxonomy_data_"+str(args.expID)+str(args.negsamples)+"_.pkl", "wb") as f:

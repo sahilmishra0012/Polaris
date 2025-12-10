@@ -137,6 +137,8 @@ def experiment(args):
     if not os.path.isfile(os.path.join("../data/", args.dataset, "processed", "taxonomy_data_"+str(args.expID)+str(args.negsamples)+"_.pkl")):
         if args.dataset == 'computer_science' or args.dataset == 'psychology' or args.dataset == 'mesh' or args.dataset == 'wordnet_verb' or args.dataset == 'semeval_food':
             create_mag_data(args)
+        elif args.dataset == 'birds':
+            create_image_data(args)
         else:
             create_data(args)
 

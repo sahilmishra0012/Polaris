@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 from vmf import VMFRegularisation
 from manifolds.sphere import Sphere
 from svgd import *
+import open_clip
 
 
 class PolarTaxo(nn.Module):
@@ -21,7 +22,11 @@ class PolarTaxo(nn.Module):
         self.args = args
         self.manifold = Sphere()
 
-        self.pre_train_model = self.__load_pre_trained__()
+        if self.args.dataset == 'birds':
+            self.pre_train_model, self.image_preprocess = open_clip.create_model_from_pretrained(
+                'hf-hub:laion/CLIP-ViT-H-14-laion2B-s32B-b79K')
+        else:
+            self.pre_train_model = self.__load_pre_trained__()
 
         # Spherical
         self.vmf_regulariser = VMFRegularisation(args=self.args,
@@ -44,6 +49,20 @@ class PolarTaxo(nn.Module):
         print("Model Loaded!")
         return model
 
+    def get_image_cls(self, encode_inputs):
+        with torch.no_grad():
+            image_embedding = self.pre_train_model.encode_image(encode_inputs)
+            image_embedding /= image_embedding.norm(dim=-1, keepdim=True)
+
+        return image_embedding
+
+    def get_label_cls(self, encode_inputs):
+        with torch.no_grad():
+            text_embedding = self.pre_train_model.encode_text(encode_inputs)
+            text_embedding /= text_embedding.norm(dim=-1, keepdim=True)
+
+        return text_embedding
+
     def get_cls(self, encode_inputs):
         if self.args.model == 'snowflake':
             cls_embed = self.pre_train_model(
@@ -55,6 +74,24 @@ class PolarTaxo(nn.Module):
             cls_embed = last_hidden_state[:, 0, :]
 
         return cls_embed
+
+    def multimodal_parent_projection(self, cls_embed):
+        cls_embeddings = self.get_label_cls(cls_embed)
+        v = self.manifold.proj_tan(self.pole, cls_embeddings)
+        v_sphere = self.manifold.expmap_retracted(self.pole, v)
+
+        e = self.parent_sphere(v_sphere)
+
+        return e
+
+    def multimodal_child_projection(self, cls_embed):
+        cls_embeddings = self.get_image_cls(cls_embed)
+        v = self.manifold.proj_tan(self.pole, cls_embeddings)
+        v_sphere = self.manifold.expmap_retracted(self.pole, v)
+
+        e = self.parent_sphere(v_sphere)
+
+        return e
 
     def par_projection(self, cls_embed):
 

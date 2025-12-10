@@ -4,7 +4,8 @@ import pickle as pkl
 import torch
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.data.distributed import DistributedSampler
-import json
+import open_clip
+from PIL import Image
 
 
 class Data_TRAIN_MAG(Dataset):
@@ -328,6 +329,122 @@ class Data_TEST_MAG(Dataset):
         return len(self.true_concept_set)
 
 
+class Data_TRAIN_Birds(Dataset):
+    def __init__(self, args):
+        super(Data_TRAIN_Birds, self).__init__()
+
+        self.args = args
+        self.dataset = args.dataset
+        print("Dataset: {}".format(self.dataset))
+        self.data = self.__load_data__(self.dataset)
+        self.tokenizer = open_clip.get_tokenizer(
+            'hf-hub:laion/CLIP-ViT-H-14-laion2B-s32B-b79K')
+        self.image_embedding_model, self.image_preprocess = open_clip.create_model_from_pretrained(
+            'hf-hub:laion/CLIP-ViT-H-14-laion2B-s32B-b79K')
+
+        self.concept_set = self.data["concept_set"]
+        self.concept_id = self.data["concept2id"]
+        self.id_concept = self.data["id2concept"]
+        self.id_context = self.data["id2context"]
+        self.train_concept_set = self.data["train_concept_set"]
+        self.train_parent_list = self.data["train_parent_list"]
+        self.train_child_list = self.data["train_child_list"]
+        self.train_negative_parent_dict = self.data["train_negative_parent_dict"]
+        self.child_parent_pair = self.data["child_parent_pair"]
+        self.child_neg_parent_pair = self.data["child_neg_parent_pair"]
+        self.path2root = self.data["path2root"]
+
+        self.train_child_parent_negative_parent_triple = self.data[
+            "train_child_parent_negative_parent_triple"]
+        print("Training samples: {}".format(
+            len(self.train_child_parent_negative_parent_triple)))
+
+    def __load_data__(self, dataset):
+        with open(os.path.join("../data/", dataset, "processed", "taxonomy_data_"+str(self.args.expID)+str(self.args.negsamples)+"_.pkl"), "rb") as f:
+            data = pkl.load(f)
+
+        return data
+
+    def generate_parent_child_token_ids(self, index):
+        child_id, parent_id, negative_parent_id = self.train_child_parent_negative_parent_triple[
+            index]
+
+        child_image = self.id_concept[child_id]
+        positive_label = self.id_concept[parent_id]
+        negative_label = self.id_concept[negative_parent_id]
+
+        # Encode images and text
+        positive_label_tokenized = self.tokenizer(positive_label)
+        negative_label_tokenized = self.tokenizer(negative_label)
+        child_image = Image.open(child_image)
+        child_image_processed = self.image_preprocess(child_image).unsqueeze(0)
+
+        return positive_label_tokenized, child_image_processed, negative_label_tokenized
+
+    def __getitem__(self, index):
+        encode_parent, encode_child, encode_negative_parents = self.generate_parent_child_token_ids(
+            index)
+
+        return encode_parent, encode_child, encode_negative_parents
+
+    def __len__(self):
+        return len(self.train_child_parent_negative_parent_triple)
+
+
+class Data_TEST_Birds(Dataset):
+    def __init__(self, args):
+        super(Data_TEST_Birds, self).__init__()
+
+        self.args = args
+        self.dataset = args.dataset
+        print("Dataset: {}".format(self.dataset))
+
+        self.data = self.__load_data__(self.dataset)
+        self.tokenizer = open_clip.get_tokenizer(
+            'hf-hub:laion/CLIP-ViT-H-14-laion2B-s32B-b79K')
+
+        self.concept_set = self.data["concept_set"]
+        self.concept_id = self.data["concept2id"]
+        self.id_concept = self.data["id2concept"]
+        # self.txid_concept_json = json.load(
+        #     open(f"../data/{self.dataset}/key_value.json"))
+        self.id_context = self.data["id2context"]
+        self.train_concept_set = list(self.data["train_concept_set"])
+        self.path2root = self.data["path2root"]
+        self.test_concepts_id = self.data["test_concepts_id"]
+        self.test_gt_id = self.data["test_gt_id"]
+        self.true_concept_set = self.data['all_labels_set']
+        self.levels = self.data['node_levels']
+
+        self.encode_query = self.generate_test_token_ids(
+            self.tokenizer, self.test_concepts_id)
+
+    def __load_data__(self, dataset):
+        with open(os.path.join("../data/", dataset, "processed", "taxonomy_data_"+str(self.args.expID)+str(self.args.negsamples)+"_.pkl"), "rb") as f:
+            data = pkl.load(f)
+
+        return data
+
+    def generate_test_token_ids(self, test_concepts_id):
+        all_images = [self.id_concept[concept_id]
+                      for concept_id in test_concepts_id]
+
+        return all_images
+
+    def tokenize_candidate_labels(self, candidate_ids):
+        # for each candidate id
+        candidate_labels = [self.id_concept[candidate_ids]]
+        labels_tokenized = self.tokenizer(candidate_labels)
+
+        return labels_tokenized
+
+    def __getitem__(self, index):
+        candidate_id = self.true_concept_set[index]
+        tokenized_label = self.tokenize_candidate_labels(candidate_id)
+
+        return tokenized_label
+
+
 class Data_TRAIN(Dataset):
 
     def __init__(self, args, tokenizer):
@@ -603,6 +720,8 @@ def load_data(args, tokenizer, flag):
         # data_set = Data_TEST(args, tokenizer)
         if args.dataset in ['computer_science', 'psychology', 'mesh', 'wordnet_verb', 'semeval_food']:
             data_set = Data_TEST_MAG(args, tokenizer)
+        elif args.dataset == 'birds':
+            data_set = Data_TEST_Birds(args)
         else:
             data_set = Data_TEST(args, tokenizer)
     else:
@@ -613,6 +732,8 @@ def load_data(args, tokenizer, flag):
 
         if args.dataset in ['computer_science', 'psychology', 'mesh', 'wordnet_verb', 'semeval_food']:
             data_set = Data_TRAIN_MAG(args, tokenizer)
+        elif args.dataset == 'birds':
+            data_set = Data_TRAIN_Birds(args)
         else:
             data_set = Data_TRAIN(args, tokenizer)
 

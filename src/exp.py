@@ -35,11 +35,11 @@ class Experiments(object):
         if self.args.dataset == 'birds':
             self.args.tokenizer = self.tokenizer
             self.args.pretrained_model, self.args.preprocess = open_clip.create_model_from_pretrained(
-                'hf-hub:laion/CLIP-ViT-H-14-laion2B-s32B-b79K')
+                'local-dir:/home/models/CLIP-ViT-H-14-laion2B-s32B-b79K')
             self.train_loader, self.train_set = load_data(
-                self.args, "train")
+                self.args, None, "train")
             self.test_loader, self.test_set = load_data(
-                self.args, "test")
+                self.args, None, "test")
         else:
             self.train_loader, self.train_set = load_data(
                 self.args, self.tokenizer, flag='train')
@@ -68,7 +68,7 @@ class Experiments(object):
         if self.args.dataset == 'birds':
             print("Loading CLIP Tokenizer...")
             tokenizer = open_clip.get_tokenizer(
-                'hf-hub:laion/CLIP-ViT-H-14-laion2B-s32B-b79K')
+                model_name='local-dir:/home/models/CLIP-ViT-H-14-laion2B-s32B-b79K')
         else:
             if self.args.model == 'bert':
                 tokenizer = BertTokenizer.from_pretrained(
@@ -286,8 +286,8 @@ class Experiments(object):
 
             for i in tqdm(range(num_queries), desc='Evaluating Queries'):
                 q_sph = q_sphere[i].unsqueeze(0).expand(num_candidates, -1)
-                q_mu = q_mu[i].unsqueeze(0).expand(num_candidates, -1)
-                q_k = q_k[i].unsqueeze(0).expand(num_candidates, -1)
+                # q_mu = q_mu[i].unsqueeze(0).expand(num_candidates, -1)
+                # q_k = q_k[i].unsqueeze(0).expand(num_candidates, -1)
 
                 geometric_score = torch.sum(candidates_sphere*q_sph, dim=1)
 
@@ -313,16 +313,16 @@ class Experiments(object):
                   'Recall@5:{:.05f}'.format(test_metrics["Recall@5"]),
                   'Recall@10: {:.05f}'.format(test_metrics["Recall@10"]))
 
-        results_json_dir = f'../results/{self.args.dataset}/{self.args.exp_name}'
-        if not os.path.exists(results_json_dir):
-            os.makedirs(results_json_dir, exist_ok=True)
-        with open(f'../results/{self.args.dataset}/{self.args.exp_name}/res_{self.exp_setting}.json', 'a+') as f:
-            d = vars(self.args)
-            expt_details = {
-                "Arguments": d,
-                "Test Metrics": test_metrics,
-            }
-            json.dump(expt_details, f, indent=4)
+        # results_json_dir = f'../results/{self.args.dataset}/{self.args.exp_name}'
+        # if not os.path.exists(results_json_dir):
+        #     os.makedirs(results_json_dir, exist_ok=True)
+        # with open(f'../results/{self.args.dataset}/{self.args.exp_name}/res_{self.exp_setting}.json', 'a+') as f:
+        #     d = vars(self.args)
+        #     expt_details = {
+        #         "Arguments": d,
+        #         "Test Metrics": test_metrics,
+        #     }
+        #     json.dump(expt_details, f, indent=4)
 
         return test_metrics
 

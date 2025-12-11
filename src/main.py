@@ -178,7 +178,7 @@ if __name__ == '__main__':
         args.epochs = 30
         args.embed_size = 256
     elif args.dataset == 'birds':
-        args.negsamples = 1
-        args.epochs = 50
-        args.embed_size = 256
+        args.negsamples = 10
+        args.epochs = 75
+        args.embed_size = 512
     experiment(args)

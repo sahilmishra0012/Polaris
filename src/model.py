@@ -51,6 +51,8 @@ class PolarTaxo(nn.Module):
 
     def get_image_cls(self, encode_inputs):
         with torch.no_grad():
+            encode_inputs = encode_inputs.view(encode_inputs.size(
+                0), encode_inputs.size(2), encode_inputs.size(3), encode_inputs.size(4))
             image_embedding = self.pre_train_model.encode_image(encode_inputs)
             image_embedding /= image_embedding.norm(dim=-1, keepdim=True)
 
@@ -58,6 +60,8 @@ class PolarTaxo(nn.Module):
 
     def get_label_cls(self, encode_inputs):
         with torch.no_grad():
+            encode_inputs = encode_inputs.view(
+                encode_inputs.size(0), encode_inputs.size(2))
             text_embedding = self.pre_train_model.encode_text(encode_inputs)
             text_embedding /= text_embedding.norm(dim=-1, keepdim=True)
 

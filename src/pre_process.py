@@ -458,8 +458,7 @@ def pre_process_mag(args, outID=True):
 
 def pre_process_images(args, outID=True):
     print("Processing Birds dataset...")
-    dataset = 'birds'
-    negsamples = args.negsamples
+    dataset = args.dataset
 
     def load_file(filepath):
         try:
@@ -495,7 +494,7 @@ def pre_process_images(args, outID=True):
     for c in concepts:
         if c.startswith('/'):
             continue
-        all_labels_set.add(c)
+        all_labels_set.add(concept_id[c])
 
     all_taxo_dict = collections.defaultdict(list)
     all_taxo_dict_reverse = collections.defaultdict(list)
@@ -647,7 +646,6 @@ def pre_process_images(args, outID=True):
 
     val_concepts_ids, val_gts_ids = [], []
     test_concepts_ids, test_gts_ids = get_eval_data(test_term_lines)
-    print(test_concepts_ids)
 
     sampled_negative_parent_dict = {}
     negative_parent_list = []
@@ -660,35 +658,45 @@ def pre_process_images(args, outID=True):
     print(
         f"There are {len(child_parent_pair)} training pairs in the training set.")
 
+    max_attempts_per_pair = 200
+    k_negatives = args.negsamples
+    train_concept_list = list(all_labels_set)
+
     for child_id, parent_id in tqdm(child_parent_pair, desc="Generating (c, p, n) Triplets"):
         found_negatives = []
-        max_attempts = 50
+        found_set = set()
         attempts = 0
 
-        while attempts < max_attempts:
+        while len(found_negatives) < k_negatives and attempts < max_attempts_per_pair:
             attempts += 1
-            random_negative = np.random.choice(list(train_concept_set))
+            random_negative = np.random.choice(train_concept_list)
 
-            parent_set = set(chd2par_dict.get(child_id, ()))  # safe if missing
+            parent_set = set(chd2par_dict.get(child_id, ()))
 
             if (random_negative != child_id and
                 random_negative != parent_id and
                 random_negative not in parent_set and
-                    random_negative not in found_negatives):
+                    random_negative not in found_set):
                 found_negatives.append(random_negative)
+                found_set.add(random_negative)
                 count_fallback_samples += 1
-                break
 
-        if not found_negatives:
+        needed = k_negatives - len(found_negatives)
+        if needed > 0:
             parent_set = set(chd2par_dict.get(child_id, ()))
-            pool = [x for x in train_concept_set
-                    if x != child_id and x != parent_id and x not in parent_set and x not in found_negatives]
+            pool = [x for x in train_concept_list
+                    if x != child_id and x != parent_id and x not in parent_set and x not in found_set]
+
             if pool:
-                chosen = random.choice(pool)
-                found_negatives.append(chosen)
-                count_fallback_samples += 1
-            else:
-                continue
+                # sample up to `needed` items (without replacement)
+                to_take = min(needed, len(pool))
+                chosen = random.sample(pool, to_take)
+                found_negatives.extend(chosen)
+                found_set.update(chosen)
+                count_fallback_samples += len(chosen)
+
+        if len(found_negatives) < k_negatives:
+            continue
 
         for neg_id in found_negatives:
             training_triplets.append((child_id, parent_id, neg_id))

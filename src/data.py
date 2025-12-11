@@ -413,11 +413,10 @@ class Data_TEST_Birds(Dataset):
         self.path2root = self.data["path2root"]
         self.test_concepts_id = self.data["test_concepts_id"]
         self.test_gt_id = self.data["test_gt_id"]
-        self.true_concept_set = self.data['all_labels_set']
+        self.true_concept_set = list(self.data['all_labels_set'])
         self.levels = self.data['node_levels']
 
-        self.encode_query = self.generate_test_token_ids(
-            self.tokenizer, self.test_concepts_id)
+        self.encode_query = self.generate_test_token_ids(self.test_concepts_id)
 
     def __load_data__(self, dataset):
         with open(os.path.join("../data/", dataset, "processed", "taxonomy_data_"+str(self.args.expID)+str(self.args.negsamples)+"_.pkl"), "rb") as f:
@@ -429,17 +428,17 @@ class Data_TEST_Birds(Dataset):
         all_images = [self.id_concept[concept_id]
                       for concept_id in test_concepts_id]
 
-        image_embeddings = list()
+        image_tensors = list()
         with torch.no_grad():
             for path in all_images:
                 img = Image.open(path).convert("RGB")
                 img_tensor = self.preprocess(img).unsqueeze(0)
 
-                image_embeddings.append(img_tensor)
+                image_tensors.append(img_tensor)
 
-            image_embeddings = torch.stack(img_tensor, dim=0)
+            image_tensors = torch.stack(image_tensors, dim=0)
 
-        return image_embeddings.cuda()
+        return image_tensors.cuda()
 
     def tokenize_candidate_labels(self, candidate_ids):
         # for each candidate id
@@ -453,6 +452,9 @@ class Data_TEST_Birds(Dataset):
         tokenized_label = self.tokenize_candidate_labels(candidate_id)
 
         return tokenized_label.cuda()
+
+    def __len__(self):
+        return len(self.true_concept_set)
 
 
 class Data_TRAIN(Dataset):

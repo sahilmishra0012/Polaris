@@ -22,11 +22,10 @@ class PolarTaxo(nn.Module):
         self.args = args
         self.manifold = Sphere()
 
-        if self.args.dataset == 'birds':
-            self.pre_train_model, self.image_preprocess = open_clip.create_model_from_pretrained(
-                'hf-hub:laion/CLIP-ViT-H-14-laion2B-s32B-b79K')
-        else:
+        if self.args.dataset != 'birds':
             self.pre_train_model = self.__load_pre_trained__()
+        else:
+            self.pre_train_model = self.args.pretrained_model
 
         # Spherical
         self.vmf_regulariser = VMFRegularisation(args=self.args,
@@ -165,10 +164,15 @@ class PolarTaxo(nn.Module):
         return w_loss
 
     def forward(self, step, encode_parent, encode_child, encode_negative):
-
-        parent_sphere = self.par_projection(encode_parent)
-        child_sphere = self.child_projection(encode_child)
-        negative_sphere = self.par_projection(encode_negative)
+        if self.args.dataset == 'birds':
+            parent_sphere = self.multimodal_parent_projection(encode_parent)
+            child_sphere = self.multimodal_child_projection(encode_child)
+            negative_sphere = self.multimodal_parent_projection(
+                encode_negative)
+        else:
+            parent_sphere = self.par_projection(encode_parent)
+            child_sphere = self.child_projection(encode_child)
+            negative_sphere = self.par_projection(encode_negative)
 
         dot_cp = torch.sum(parent_sphere*child_sphere, dim=1)
         dot_cn = torch.sum(negative_sphere*child_sphere, dim=1)

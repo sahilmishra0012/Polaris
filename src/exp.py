@@ -32,20 +32,22 @@ class Experiments(object):
         self.args = args
         self.tokenizer = self.__load_tokenizer__()
 
-        if self.args.dataset != 'birds':
+        if self.args.dataset == 'birds':
+            self.args.tokenizer = self.tokenizer
+            self.args.pretrained_model, self.args.preprocess = open_clip.create_model_from_pretrained(
+                'hf-hub:laion/CLIP-ViT-H-14-laion2B-s32B-b79K')
             self.train_loader, self.train_set = load_data(
-                self.args, self.tokenizer, "train")
+                self.args, "train")
             self.test_loader, self.test_set = load_data(
-                self.args, self.tokenizer, "test")
+                self.args, "test")
         else:
-            # Tokenizer loaded in the dataset class for multimodal experiments.
             self.train_loader, self.train_set = load_data(
-                args, None, flag='train')
+                self.args, self.tokenizer, flag='train')
             self.test_loader, self.test_set = load_data(
-                args, None, flag='test')
+                self.args, self.tokenizer, flag='test')
         self.accumulation_steps = self.args.accumulation_steps
 
-        self.model = PolarTaxo(args)
+        self.model = PolarTaxo(self.args)
 
         self.optimizer = self._select_optimizer()
         self._set_device()
@@ -63,12 +65,17 @@ class Experiments(object):
         print(self.args)
 
     def __load_tokenizer__(self):
-        if self.args.model == 'bert':
-            tokenizer = BertTokenizer.from_pretrained(
-                '/home/models/bert-base-uncased')
-        elif self.args.model == 'snowflake':
-            tokenizer = AutoTokenizer.from_pretrained(
-                'Snowflake/snowflake-arctic-embed-m')
+        if self.args.dataset == 'birds':
+            print("Loading CLIP Tokenizer...")
+            tokenizer = open_clip.get_tokenizer(
+                'hf-hub:laion/CLIP-ViT-H-14-laion2B-s32B-b79K')
+        else:
+            if self.args.model == 'bert':
+                tokenizer = BertTokenizer.from_pretrained(
+                    '/home/models/bert-base-uncased')
+            elif self.args.model == 'snowflake':
+                tokenizer = AutoTokenizer.from_pretrained(
+                    'Snowflake/snowflake-arctic-embed-m')
         print("Tokenizer Loaded!")
         return tokenizer
 
@@ -231,6 +238,90 @@ class Experiments(object):
 
         pos = r * theta_unit
         return pos, r, h
+
+    def predict_multimodal(self, tag=None, path=None
+                           ):
+        print("Prediction starting....")
+        store_csv = False
+        if tag == 'test' and path:
+            self.model.load_state_dict(torch.load(path))
+            store_csv = True
+
+        self.model.eval()
+        with torch.no_grad():
+            score_list = []
+            gt_label = self.test_set.test_gt_id
+
+            # Query is an image embedding batch
+            q_sphere = self.model.multimodal_child_projection(
+                self.test_set.encode_query)
+            q_k = self.model.vmf_regulariser.kappa_predictor(q_sphere)
+            q_mu = self.model.vmf_regulariser.mu_predictor(q_sphere)
+
+            candidates_sphere = list()
+            candidates_k = list()
+            candidates_mu = list()
+
+            for encode_candidate in self.test_loader:
+                candidate_sphere = self.model.multimodal_parent_projection(
+                    encode_candidate)
+                candidate_k = self.model.vmf_regulariser.kappa_predictor(
+                    candidate_sphere)
+                candidate_mu = self.model.vmf_regulariser.kappa_predictor(
+                    candidate_sphere)
+
+                candidates_sphere.append(candidate_sphere)
+                candidates_k.append(candidate_k)
+                candidates_mu.append(candidate_mu)
+
+            candidates_sphere = torch.cat(candidates_sphere, dim=0)
+            candidates_k = torch.cat(candidates_k, dim=0)
+            candidates_mu = torch.cat(candidates_mu, dim=0)
+
+            num_queries = q_sphere.size(0)
+            num_candidates = candidates_sphere.size(0)
+
+            for i in tqdm(range(num_queries), desc='Evaluating Queries'):
+                q_sph = q_sphere[i].unsqueeze(0).expand(num_candidates, -1)
+                q_mu = q_mu[i].unsqueeze(0).expand(num_candidates, -1)
+                q_k = q_k[i].unsqueeze(0).expand(num_candidates, -1)
+
+                geometric_score = torch.sum(candidates_sphere*q_sph, dim=1)
+
+                final_score = geometric_score
+
+                score_list.append(final_score)
+
+            score_matrix = torch.stack(score_list, dim=0)
+            print("Score matrix size:", score_matrix.size())
+            sorted_scores, indices = score_matrix.sort(dim=1, descending=True)
+            print(sorted_scores[:, :5])
+
+            candidate_list = np.array(list(self.test_set.true_concept_set))
+            test_metrics = metrics_multi_p(
+                indices, gt_label, candidate_list, self.test_set.id_concept, self.test_set.test_concepts_id)
+
+            print('Hit@1:{:.05f}'.format(test_metrics["Prec@1"]),
+                  'mrr:{:.05f}'.format(test_metrics["MRR"]),
+                  'Recall@1:{:.05f}'.format(test_metrics["Recall@1"]),
+                  'mr:{:.05f}'.format(test_metrics["MR"]),
+                  'Hit@5:{:.05f}'.format(test_metrics["Prec@5"]),
+                  'Hit@10:{:.05f}'.format(test_metrics["Prec@10"]),
+                  'Recall@5:{:.05f}'.format(test_metrics["Recall@5"]),
+                  'Recall@10: {:.05f}'.format(test_metrics["Recall@10"]))
+
+        results_json_dir = f'../results/{self.args.dataset}/{self.args.exp_name}'
+        if not os.path.exists(results_json_dir):
+            os.makedirs(results_json_dir, exist_ok=True)
+        with open(f'../results/{self.args.dataset}/{self.args.exp_name}/res_{self.exp_setting}.json', 'a+') as f:
+            d = vars(self.args)
+            expt_details = {
+                "Arguments": d,
+                "Test Metrics": test_metrics,
+            }
+            json.dump(expt_details, f, indent=4)
+
+        return test_metrics
 
     def predict(self, tag=None, path=None):
         print("Prediction starting.....")

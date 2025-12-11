@@ -337,10 +337,8 @@ class Data_TRAIN_Birds(Dataset):
         self.dataset = args.dataset
         print("Dataset: {}".format(self.dataset))
         self.data = self.__load_data__(self.dataset)
-        self.tokenizer = open_clip.get_tokenizer(
-            'hf-hub:laion/CLIP-ViT-H-14-laion2B-s32B-b79K')
-        self.image_embedding_model, self.image_preprocess = open_clip.create_model_from_pretrained(
-            'hf-hub:laion/CLIP-ViT-H-14-laion2B-s32B-b79K')
+        self.tokenizer = self.args.tokenizer
+        self.image_embedding_model, self.image_preprocess = self.args.pretrained_model, self.args.preprocess
 
         self.concept_set = self.data["concept_set"]
         self.concept_id = self.data["concept2id"]
@@ -376,7 +374,7 @@ class Data_TRAIN_Birds(Dataset):
         # Encode images and text
         positive_label_tokenized = self.tokenizer(positive_label)
         negative_label_tokenized = self.tokenizer(negative_label)
-        child_image = Image.open(child_image)
+        child_image = Image.open(child_image).convert('rgb')
         child_image_processed = self.image_preprocess(child_image).unsqueeze(0)
 
         return positive_label_tokenized, child_image_processed, negative_label_tokenized
@@ -400,8 +398,8 @@ class Data_TEST_Birds(Dataset):
         print("Dataset: {}".format(self.dataset))
 
         self.data = self.__load_data__(self.dataset)
-        self.tokenizer = open_clip.get_tokenizer(
-            'hf-hub:laion/CLIP-ViT-H-14-laion2B-s32B-b79K')
+        self.tokenizer = self.args.tokenizer
+        self.pretrained_model, self.preprocess = self.args.pretrained_model, self.args.preprocess
 
         self.concept_set = self.data["concept_set"]
         self.concept_id = self.data["concept2id"]
@@ -429,7 +427,17 @@ class Data_TEST_Birds(Dataset):
         all_images = [self.id_concept[concept_id]
                       for concept_id in test_concepts_id]
 
-        return all_images
+        image_embeddings = list()
+        with torch.no_grad():
+            for path in all_images:
+                img = Image.open(path).convert("RGB")
+                img_tensor = self.preprocess(img).unsqueeze(0)
+
+                image_embeddings.append(img_tensor)
+
+            image_embeddings = torch.stack(img_tensor, dim=0)
+
+        return image_embeddings.cuda()
 
     def tokenize_candidate_labels(self, candidate_ids):
         # for each candidate id

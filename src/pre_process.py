@@ -626,27 +626,28 @@ def pre_process_images(args, outID=True):
     def get_eval_data(lines):
         concept_ids, gts_ids = [], []
         for line in lines:
-            _, child_term = line.strip().split("\t")
-        parent_ids = list()
+            child_term, _ = line.strip().split("\t")
 
-        if child_term in concept_id:
-            child_id = concept_id[child_term]
-            parent_terms = all_taxo_dict_reverse.get(child_term, [])
+            parent_ids = list()
 
-            for p in parent_terms:
-                if p in concept_id:
-                    parent_ids.append(concept_id[p])
-            concept_ids.append(child_id)
-            gts_ids.append(parent_ids)
-        else:
-            print(
-                f"Found invalid label {child_term} since it doesnt have an associated label..removing from test set")
+            if child_term in concept_id:
+                child_id = concept_id[child_term]
+                parent_terms = all_taxo_dict_reverse.get(child_term, [])
+
+                for p in parent_terms:
+                    if p in concept_id:
+                        parent_ids.append(concept_id[p])
+                concept_ids.append(child_id)
+                gts_ids.append(parent_ids)
+            else:
+                print(
+                    f"Found invalid label {child_term} since it doesnt have an associated label..removing from test set")
 
         return concept_ids, gts_ids
 
-    # Keeping empty for consistency purposes. there is no validation split for this dataset
     val_concepts_ids, val_gts_ids = [], []
     test_concepts_ids, test_gts_ids = get_eval_data(test_term_lines)
+    print(test_concepts_ids)
 
     sampled_negative_parent_dict = {}
     negative_parent_list = []
@@ -660,16 +661,34 @@ def pre_process_images(args, outID=True):
         f"There are {len(child_parent_pair)} training pairs in the training set.")
 
     for child_id, parent_id in tqdm(child_parent_pair, desc="Generating (c, p, n) Triplets"):
+        found_negatives = []
+        max_attempts = 50
+        attempts = 0
 
-        found_negatives = list()
-        random_negative = np.random.choice(list(train_concept_set))
+        while attempts < max_attempts:
+            attempts += 1
+            random_negative = np.random.choice(list(train_concept_set))
 
-        if (random_negative != child_id and
-            random_negative != parent_id and
-            random_negative not in chd2par_dict[child_id] and
-                random_negative not in found_negatives):
-            found_negatives.append(random_negative)
-            count_fallback_samples += 1
+            parent_set = set(chd2par_dict.get(child_id, ()))  # safe if missing
+
+            if (random_negative != child_id and
+                random_negative != parent_id and
+                random_negative not in parent_set and
+                    random_negative not in found_negatives):
+                found_negatives.append(random_negative)
+                count_fallback_samples += 1
+                break
+
+        if not found_negatives:
+            parent_set = set(chd2par_dict.get(child_id, ()))
+            pool = [x for x in train_concept_set
+                    if x != child_id and x != parent_id and x not in parent_set and x not in found_negatives]
+            if pool:
+                chosen = random.choice(pool)
+                found_negatives.append(chosen)
+                count_fallback_samples += 1
+            else:
+                continue
 
         for neg_id in found_negatives:
             training_triplets.append((child_id, parent_id, neg_id))

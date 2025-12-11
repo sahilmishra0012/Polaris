@@ -21,6 +21,7 @@ class PolarTaxo(nn.Module):
 
         self.args = args
         self.manifold = Sphere()
+        self.input_dim = 768 if args.dataset != 'birds' else 1024
 
         if self.args.dataset != 'birds':
             self.pre_train_model = self.__load_pre_trained__()
@@ -31,10 +32,10 @@ class PolarTaxo(nn.Module):
         self.vmf_regulariser = VMFRegularisation(args=self.args,
                                                  embedding_dim=self.args.embed_size, hidden_dim=self.args.hidden)
         self.child_sphere = SphericalMLP(
-            input_dim=768, hidden=self.args.hidden, output_dim=self.args.embed_size, bias=False)
+            input_dim=self.input_dim, hidden=self.args.hidden, output_dim=self.args.embed_size, bias=False)
         self.parent_sphere = SphericalMLP(
-            input_dim=768, hidden=self.args.hidden, output_dim=self.args.embed_size, bias=False)
-        pole = torch.zeros(768)
+            input_dim=self.input_dim, hidden=self.args.hidden, output_dim=self.args.embed_size, bias=False)
+        pole = torch.zeros(self.input_dim)
         pole[-1] = 1.0
         self.register_buffer("pole", pole.unsqueeze(0))
 

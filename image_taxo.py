@@ -3,6 +3,7 @@
 import os
 import csv
 import random
+import re
 
 
 def create_image_triplets(image_path):
@@ -26,4 +27,11 @@ def create_image_triplets(image_path):
 
             for image in all_images:
                 image_absolute_path = os.path.join(image_path, category, image)
-                writer.writerow([image_absolute_path, category])
+
+                category_cleaned = re.sub(r'^\d+\.', '', category)
+                writer.writerow([image_absolute_path, category_cleaned])
+
+
+if __name__ == '__main__':
+    create_image_triplets(
+        '/home/nitish/dataset/birds/Birds/CUB_200_2011/CUB_200_2011/images')

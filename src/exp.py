@@ -163,7 +163,10 @@ class Experiments(object):
             svgd_loss = np.average(svgd_losses)
             print("Loss: ", train_loss)
 
-            test_metrics = self.predict()
+            if self.args.dataset == 'birds':
+                test_metrics = self.predict_multimodal()
+            else:
+                test_metrics = self.predict()
             test_acc = test_metrics["Prec@1"]
             test_mrr = test_metrics["MRR"]
             if test_acc >= old_test_acc or test_mrr >= old_test_mrr:

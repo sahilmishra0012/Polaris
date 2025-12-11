@@ -25,7 +25,7 @@ class PolarTaxo(nn.Module):
         if self.args.dataset != 'birds':
             self.pre_train_model = self.__load_pre_trained__()
         else:
-            self.pre_train_model = self.args.pretrained_model
+            self.pre_train_model = self.args.pretrained_model.to('cuda')
 
         # Spherical
         self.vmf_regulariser = VMFRegularisation(args=self.args,

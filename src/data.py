@@ -372,10 +372,11 @@ class Data_TRAIN_Birds(Dataset):
         negative_label = self.id_concept[negative_parent_id]
 
         # Encode images and text
-        positive_label_tokenized = self.tokenizer(positive_label)
-        negative_label_tokenized = self.tokenizer(negative_label)
-        child_image = Image.open(child_image).convert('rgb')
-        child_image_processed = self.image_preprocess(child_image).unsqueeze(0)
+        positive_label_tokenized = self.tokenizer(positive_label).cuda()
+        negative_label_tokenized = self.tokenizer(negative_label).cuda()
+        child_image = Image.open(child_image).convert('RGB')
+        child_image_processed = self.image_preprocess(
+            child_image).unsqueeze(0).cuda()
 
         return positive_label_tokenized, child_image_processed, negative_label_tokenized
 
@@ -399,7 +400,8 @@ class Data_TEST_Birds(Dataset):
 
         self.data = self.__load_data__(self.dataset)
         self.tokenizer = self.args.tokenizer
-        self.pretrained_model, self.preprocess = self.args.pretrained_model, self.args.preprocess
+        self.pretrained_model, self.preprocess = self.args.pretrained_model.to(
+            'cuda'), self.args.preprocess
 
         self.concept_set = self.data["concept_set"]
         self.concept_id = self.data["concept2id"]
@@ -450,7 +452,7 @@ class Data_TEST_Birds(Dataset):
         candidate_id = self.true_concept_set[index]
         tokenized_label = self.tokenize_candidate_labels(candidate_id)
 
-        return tokenized_label
+        return tokenized_label.cuda()
 
 
 class Data_TRAIN(Dataset):

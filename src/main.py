@@ -10,7 +10,7 @@ from utils import print_local_time, set_seed
 import wandb
 
 os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
-os.environ["WANDB_MODE"] = "online"
+os.environ["WANDB_MODE"] = "offline"
 
 parser = argparse.ArgumentParser()
 
@@ -162,8 +162,8 @@ def experiment(args):
 # Additional Config
 if __name__ == '__main__':
     args.gpu_id = 2
-    args.expID = 14
-    args.batch_size = 16
+    # args.expID = 17
+    args.batch_size = 128
     args.accumulation_steps = 5
     args.geometric_weight = 0.7
     args.c = 0.4
@@ -178,7 +178,6 @@ if __name__ == '__main__':
         args.epochs = 30
         args.embed_size = 256
     elif args.dataset == 'birds':
-        args.negsamples = 10
         args.epochs = 75
         args.embed_size = 512
     experiment(args)

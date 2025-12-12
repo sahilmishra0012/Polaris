@@ -625,19 +625,16 @@ def pre_process_images(args, outID=True):
     def get_eval_data(lines):
         concept_ids, gts_ids = [], []
         for line in lines:
-            child_term, _ = line.strip().split("\t")
+            _, child_term = process_pair(line)
 
             parent_ids = list()
 
             if child_term in concept_id:
                 child_id = concept_id[child_term]
-                parent_terms = all_taxo_dict_reverse.get(child_term, [])
-
-                for p in parent_terms:
-                    if p in concept_id:
-                        parent_ids.append(concept_id[p])
+                parent_ids = all_taxo_dict_reverse.get(child_id, [])
                 concept_ids.append(child_id)
                 gts_ids.append(parent_ids)
+
             else:
                 print(
                     f"Found invalid label {child_term} since it doesnt have an associated label..removing from test set")

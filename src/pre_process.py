@@ -143,34 +143,6 @@ def pre_process_mag(args, outID=True):
     dataset = args.dataset
     negsamples = args.negsamples
 
-    def get_n_hop_neighbors(start_node, taxo_forward, taxo_reverse, max_hops=2):
-
-        neighbors = set()
-        queue = deque([(start_node, 0)])
-        visited = {start_node}
-
-        while queue:
-            current_node, current_hop = queue.popleft()
-
-            if current_hop >= max_hops:
-                continue
-
-            parents = taxo_reverse.get(current_node, [])
-            for p in parents:
-                if p not in visited:
-                    visited.add(p)
-                    neighbors.add(p)
-                    queue.append((p, current_hop + 1))
-
-            children = taxo_forward.get(current_node, [])
-            for c in children:
-                if c not in visited:
-                    visited.add(c)
-                    neighbors.add(c)
-                    queue.append((c, current_hop + 1))
-
-        return neighbors
-
     def load_file(filepath: str) -> list[str]:
         try:
             with open(filepath, 'r') as f:
@@ -453,7 +425,7 @@ def pre_process_mag(args, outID=True):
         child_neg_parent_pair, val_concepts_ids, val_gts_ids, test_concepts_ids, test_gts_ids, normalized_radii
     )
 
-# Parents are image paths and children are the labels. Dataset structured as a forest.
+# Parents are labels and children are image paths. Dataset structured as a forest.
 
 
 def pre_process_images(args, outID=True):
@@ -1033,7 +1005,7 @@ def create_data(args, maxlimit=None):
         "test_concept": test_concept,
         "test_gt": test_gt}
 
-    with open("../data/"+str(args.dataset)+"/processed/taxonomy_data_"+str(args.expID)+str(args.negsamples)+"_.pkl", "wb") as f:
+    with open("../data/"+str(args.dataset)+"/processed/taxonomy_data_"+str(args.expID)+str(args.negsamples)+str(args.seed)+"_.pkl", "wb") as f:
         pkl.dump(save_data, f)
 
     print("Waiting for saving processed data....")

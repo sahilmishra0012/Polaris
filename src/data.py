@@ -44,7 +44,7 @@ class Data_TRAIN_MAG(Dataset):
 
     def __load_data__(self, dataset):
 
-        with open(os.path.join("../data/", dataset, "processed", "taxonomy_data_"+str(self.args.expID)+str(self.args.negsamples)+"_.pkl"), "rb") as f:
+        with open(os.path.join("../data/", dataset, "processed", "taxonomy_data_"+str(self.args.expID)+str(self.args.negsamples)+str(self.args.seed)+"_.pkl"), "rb") as f:
             data = pkl.load(f)
 
         return data
@@ -194,7 +194,7 @@ class Data_TEST_MAG(Dataset):
 
     def __load_data__(self, dataset):
 
-        with open(os.path.join("../data/", dataset, "processed", "taxonomy_data_"+str(self.args.expID)+str(self.args.negsamples)+"_.pkl"), "rb") as f:
+        with open(os.path.join("../data/", dataset, "processed", "taxonomy_data_"+str(self.args.expID)+str(self.args.negsamples)+str(self.args.seed)+"_.pkl"), "rb") as f:
             data = pkl.load(f)
 
         return data
@@ -493,7 +493,7 @@ class Data_TRAIN(Dataset):
 
     def __load_data__(self, dataset):
 
-        with open(os.path.join("../data/", dataset, "processed", "taxonomy_data_"+str(self.args.expID)+str(self.args.negsamples)+"_.pkl"), "rb") as f:
+        with open(os.path.join("../data/", dataset, "processed", "taxonomy_data_"+str(self.args.expID)+str(self.args.negsamples)+str(self.args.seed)+"_.pkl"), "rb") as f:
             data = pkl.load(f)
 
         return data
@@ -614,7 +614,7 @@ class Data_TEST(Dataset):
 
     def __load_data__(self, dataset):
 
-        with open(os.path.join("../data/", dataset, "processed", "taxonomy_data_"+str(self.args.expID)+str(self.args.negsamples)+"_.pkl"), "rb") as f:
+        with open(os.path.join("../data/", dataset, "processed", "taxonomy_data_"+str(self.args.expID)+str(self.args.negsamples)+str(self.args.seed)+"_.pkl"), "rb") as f:
             data = pkl.load(f)
 
         return data

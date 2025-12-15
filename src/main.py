@@ -134,7 +134,7 @@ def experiment(args):
     print(args)
 
     set_seed(args.seed)
-    if not os.path.isfile(os.path.join("../data/", args.dataset, "processed", "taxonomy_data_"+str(args.expID)+str(args.negsamples)+"_.pkl")):
+    if not os.path.isfile(os.path.join("../data/", args.dataset, "processed", "taxonomy_data_"+str(args.expID)+str(args.negsamples)+str(args.seed)+"_.pkl")):
         if args.dataset == 'computer_science' or args.dataset == 'psychology' or args.dataset == 'mesh' or args.dataset == 'wordnet_verb' or args.dataset == 'semeval_food':
             create_mag_data(args)
         elif args.dataset == 'birds':
@@ -161,9 +161,9 @@ def experiment(args):
 
 # Additional Config
 if __name__ == '__main__':
-    args.gpu_id = 2
-    # args.expID = 17
-    args.batch_size = 128
+    args.gpu_id = 0
+    args.expID = 1
+    args.batch_size = 256
     args.accumulation_steps = 5
     args.geometric_weight = 0.7
     args.c = 0.4
@@ -180,4 +180,18 @@ if __name__ == '__main__':
     elif args.dataset == 'birds':
         args.epochs = 75
         args.embed_size = 512
+    elif args.dataset == 'semeval_food':
+        args.epochs = 200
+        args.geometric_weight = 0.9
+        args.embed_size = 512
+        args.beta = 0.3
+    elif args.dataset == 'science' or args.dataset == 'environment' or args.dataset == 'wordnet':
+        args.is_multi_parent = False
+        args.epochs = 75
+        args.accumulation_steps = 1
+        if args.dataset == 'wordnet':
+            args.embed_size = 128
+        else:
+            args.embed_size = 512
+
     experiment(args)

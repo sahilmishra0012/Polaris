@@ -10,7 +10,7 @@ from utils import print_local_time, set_seed
 import wandb
 
 os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
-os.environ["WANDB_MODE"] = "offline"
+os.environ["WANDB_MODE"] = "online"
 
 parser = argparse.ArgumentParser()
 
@@ -187,11 +187,15 @@ if __name__ == '__main__':
         args.beta = 0.3
     elif args.dataset == 'science' or args.dataset == 'environment' or args.dataset == 'wordnet':
         args.is_multi_parent = False
-        args.epochs = 75
+        args.epochs = 100
         args.accumulation_steps = 1
         if args.dataset == 'wordnet':
             args.embed_size = 128
-        else:
+        elif args.dataset == 'science':
+            args.geometric_weight = 0.9
+            args.beta = 0.3
+            args.embed_size = 512
+        elif args.dataset == 'environment':
             args.embed_size = 512
 
     experiment(args)

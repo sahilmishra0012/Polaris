@@ -21,7 +21,7 @@ from hooks import GradientLogger
 import csv
 import wandb
 
-os.environ["WANDB_MODE"] = "offline"
+os.environ["WANDB_MODE"] = "online"
 
 
 class Experiments(object):

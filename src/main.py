@@ -161,12 +161,12 @@ def experiment(args):
 
 # Additional Config
 if __name__ == '__main__':
-    args.gpu_id = 0
-    args.expID = 1
+    args.gpu_id = 1
+    args.expID = 20
     args.batch_size = 256
     args.accumulation_steps = 5
     args.geometric_weight = 0.7
-    args.c = 0.4
+    # args.c = 0.4
     args.vmf_margin = 0.3
     args.svgd_weight = 0.1
     if args.dataset == 'mesh':
@@ -181,21 +181,33 @@ if __name__ == '__main__':
         args.epochs = 75
         args.embed_size = 512
     elif args.dataset == 'semeval_food':
+        args.gpu_id = 1
         args.epochs = 200
-        args.geometric_weight = 0.9
+        args.negsamples = 20
+        args.geometric_weight = 0.7
         args.embed_size = 512
         args.beta = 0.3
+        args.kappa_align = 1.0
+        args.kappa_repel = 2.0
     elif args.dataset == 'science' or args.dataset == 'environment' or args.dataset == 'wordnet':
         args.is_multi_parent = False
-        args.epochs = 100
-        args.accumulation_steps = 1
+        args.epochs = 90
+        args.accumulation_steps = 5
+        args.negsamples = 50
+        args.kappa_align = 1.0
+        args.kappa_repel = 2.0
         if args.dataset == 'wordnet':
             args.embed_size = 128
+            args.negsamples = 10
         elif args.dataset == 'science':
-            args.geometric_weight = 0.9
-            args.beta = 0.3
             args.embed_size = 512
+            args.batch_size = 512
+            args.gpu_id = 1
+            args.beta = 0.3
         elif args.dataset == 'environment':
             args.embed_size = 512
+            args.batch_size = 256
+            args.gpu_id = 1
+            args.beta = 0.3
 
     experiment(args)

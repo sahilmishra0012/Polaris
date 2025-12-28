@@ -957,7 +957,7 @@ def create_mag_data(args):
         "node_levels": node_levels
     }
 
-    with open("../data/"+str(args.dataset)+"/processed/taxonomy_data_"+str(args.expID)+str(args.negsamples)+"_.pkl", "wb") as f:
+    with open("../data/"+str(args.dataset)+"/processed/taxonomy_data_"+str(args.expID)+str(args.negsamples)+str(args.seed)+"_.pkl", "wb") as f:
         pkl.dump(save_data, f)
 
     print("Waiting for saving processed data....")

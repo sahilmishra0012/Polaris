@@ -495,6 +495,65 @@ def precision_k(pred, gt, k):
     return val
 
 
+def prec_rec_multimodal(pred, gt, k):
+    preds = np.array(pred)
+    gts = np.array(gt).flatten()
+
+    num_queries = len(gts)
+    if num_queries == 0 or k == 0:
+        return 0.0, 0.0
+
+    pred_k = preds[:, :k]
+
+    hits_mask = (pred_k == gts[:, None])
+
+    total_hits = np.sum(hits_mask)
+
+    recall_score = total_hits / num_queries
+
+    precision_score = total_hits / (num_queries * k)
+
+    return precision_score, recall_score
+
+
+def precision_k_multimodal(pred, gt, k):
+    preds = np.array(pred)
+    gts = np.array(gt)
+
+    num_queries = len(gts)
+    if num_queries == 0 or k == 0:
+        return 0
+
+    pred_k = preds[:, :k]
+
+    gt_reshaped = gts.reshape(-1, 1)
+
+    hits = (pred_k == gt_reshaped)
+
+    total_hits = np.sum(hits)
+
+    return total_hits / (num_queries * k)
+
+
+def recall_k_multimodal(pred, gt, k):
+    gts = np.array(gt)
+    preds = np.array(pred)
+
+    num_queries = len(gts)
+    if num_queries == 0:
+        return 0
+
+    pred_k = preds[:, :k]
+
+    gt_reshaped = gts.reshape(-1, 1)
+
+    hits = (pred_k == gt_reshaped)
+
+    hit_rate = np.any(hits, axis=1)
+
+    return np.mean(hit_rate)
+
+
 def hits_at_k_multi_p(pred, gt, k):
     num_queries = len(gt)
     if num_queries == 0:
@@ -514,6 +573,30 @@ def hits_at_k_multi_p(pred, gt, k):
             num_hits += 1
 
     return num_hits / num_queries
+
+
+def recall_k_multi_p(pred, gt, k):
+
+    total_hits = 0
+    num_triplets = 0
+
+    for i in range(len(gt)):
+        preds_k = set(pred[i][:k])
+
+        true_parents = gt[i]
+        num_triplets += len(true_parents)
+
+        if not true_parents:
+            continue
+
+        for true_parent in true_parents:
+            if true_parent in preds_k:
+                total_hits += 1
+
+    if num_triplets == 0:
+        return 0.0
+
+    return total_hits / num_triplets
 
 
 def recall_k(pred, gt, k):
@@ -602,49 +685,6 @@ def wu_p_score(pred, gt, path2root, compiled):
     for i in range(len(pred)):
         path_pred = path2root[pred[i]]
         path_gt = path2root[gt[i]]
-        compiled[i].append(len(path_gt)-1)
-        shared_nodes = set(path_pred) & set(path_gt)
-        lca_depth = 1
-        for node in shared_nodes:
-            lca_depth = max(len(path2root[node])-1, lca_depth)
-        wu_p += 2*lca_depth/(len(path_pred)+len(path_gt))
-
-    wu_p = wu_p/len(gt)
-
-    return wu_p
-
-
-def recall_k_multi_p(pred, gt, k):
-
-    total_hits = 0
-    num_triplets = 0
-
-    for i in range(len(gt)):
-        preds_k = set(pred[i][:k])
-
-        true_parents = gt[i]
-        num_triplets += len(true_parents)
-
-        if not true_parents:
-            continue
-
-        for true_parent in true_parents:
-            if true_parent in preds_k:
-                total_hits += 1
-
-    if num_triplets == 0:
-        return 0.0
-
-    return total_hits / num_triplets
-
-
-def wu_p_score(pred, gt, path2root, compiled):
-
-    pred = np.squeeze(pred[:, 0])
-    wu_p = 0
-    for i in range(len(pred)):
-        path_pred = path2root[pred[i]]
-        path_gt = path2root[gt[i]]
         compiled[i].append(len(path_gt))
         shared_nodes = set(path_pred) & set(path_gt)
         lca_depth = 1
@@ -655,6 +695,29 @@ def wu_p_score(pred, gt, path2root, compiled):
     wu_p = wu_p/len(gt)
 
     return wu_p
+
+
+def f1_score(precision, recall):
+
+    return (2*precision*recall)/(precision+recall)
+
+
+def metrics_multi_modal(indices, gt, candidate_list, id_concept, test_concepts_id):
+    ind = np.squeeze(indices.detach().cpu().numpy())
+    x, y = ind.shape
+
+    pred = np.zeros_like(ind)
+    for i in range(x):
+        pred[i] = candidate_list[ind[i]]
+
+    prec1, rec1 = prec_rec_multimodal(pred, gt, k=1)
+    f1 = f1_score(prec1, rec1)
+    mrr, mr = rank_scores_multi_p(
+        pred, gt)
+
+    return {
+        "Precision": prec1, "Recall": rec1, "f1": f1, "mrr": mrr, "mr": mr
+    }
 
 
 def metrics_multi_p(indices, gt, candidate_list, id_concept, test_concepts_id):

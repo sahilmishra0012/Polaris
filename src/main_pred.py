@@ -111,4 +111,4 @@ exp = Experiments(args)
 #     tag='test', path='/home/nitish/Polartaxo/result/mesh/train/experiment_3_varied_geometric_weight/experiment_bert_mesh_2_60_1024_0.5_128_0.5_0.5.')
 # exp.predict(tag='test', path='/home/nitish/Polartaxo/result/mesh/train/experiment_3_varied_geometric_weight/experiment_bert_mesh_2_60_1024_0.5_128_0.8_0.5.')
 exp.predict_multimodal(
-    tag='test', path='/home/nitish/Polartaxo/result/birds/train/multimodal_hierarchy/experiment_birds_14_75_16_0.5_512_0.7_0.4_0.3_4.5_2.5_vmf_theta_0.1.checkpoint')
+    tag='test', path='/home/nitish/Polartaxo/final_result/birds/independent_seed_runs/experiment_birds_20_0.5_512_0.7_0.4_0.3_4.5_2.5_vmf_theta_0.1_20.pt')

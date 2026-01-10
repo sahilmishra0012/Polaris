@@ -165,10 +165,13 @@ class Experiments(object):
 
             if self.args.dataset == 'birds':
                 test_metrics = self.predict_multimodal()
+                test_acc = test_metrics['Precision']
+                test_mrr = test_metrics['mrr']
             else:
                 test_metrics = self.predict()
-            test_acc = test_metrics["Prec@1"]
-            test_mrr = test_metrics["MRR"]
+                test_acc = test_metrics["Prec@1"]
+                test_mrr = test_metrics["MRR"]
+
             if test_acc >= old_test_acc or test_mrr >= old_test_mrr:
                 final_res_dir = f"../final_result/{self.args.dataset}/{self.args.exp_name}"
                 if not os.path.exists(final_res_dir):
@@ -180,22 +183,34 @@ class Experiments(object):
                 old_test_wu_p = test_wu_p
             time_tracker.append(time.time()-epoch_time)
 
-            print('\nEpoch: {:04d}'.format(epoch + 1),
-                  'train_loss:{:.05f}'.format(train_loss),
-                  'hit@1:{:.05f}'.format(test_acc),
-                  'mrr:{:.05f}'.format(test_mrr),
-                  'Recall@1:{:.05f}'.format(test_metrics["Recall@1"]),
-                  'Recall@5:{:.05f}'.format(test_metrics["Recall@5"]),
-                  'Recall@10:{:0.5f}'.format(test_metrics["Recall@10"]),
-                  'mr:{:.05f}'.format(test_metrics["MR"]),
-                  'hit5:{:.05f}'.format(test_metrics["Prec@5"]),
-                  'hit10:{:.05f}'.format(test_metrics["Prec@10"]),
-                  'epoch_time:{:.01f}s'.format(time.time()-epoch_time),
-                  'remain_time:{:.01f}s'.format(
-                      np.mean(time_tracker)*(self.args.epochs-(1+epoch))),
-                  )
+            if self.args.dataset != 'birds':
+                print('\nEpoch: {:04d}'.format(epoch + 1),
+                      'train_loss:{:.05f}'.format(train_loss),
+                      'hit@1:{:.05f}'.format(test_acc),
+                      'mrr:{:.05f}'.format(test_mrr),
+                      'Recall@1:{:.05f}'.format(test_metrics["Recall@1"]),
+                      'Recall@5:{:.05f}'.format(test_metrics["Recall@5"]),
+                      'Recall@10:{:0.5f}'.format(test_metrics["Recall@10"]),
+                      'mr:{:.05f}'.format(test_metrics["MR"]),
+                      'hit5:{:.05f}'.format(test_metrics["Prec@5"]),
+                      'hit10:{:.05f}'.format(test_metrics["Prec@10"]),
+                      'epoch_time:{:.01f}s'.format(time.time()-epoch_time),
+                      'remain_time:{:.01f}s'.format(
+                    np.mean(time_tracker)*(self.args.epochs-(1+epoch))),
+                )
 
-            if self.args.is_multi_parent is True and self.args.wandb == 1:
+            if self.args.dataset == 'birds' and self.args.wandb == 1:
+                wandb.log(
+                    {
+                        'train_loss': (train_loss),
+                        'SVGD_Gradient_NORM': (svgd_loss),
+                        'Precision': test_metrics['Precision'],
+                        'Recall': test_metrics['Recall'],
+                        'MR': test_metrics['mr'],
+                        'MRR': test_metrics['mrr']
+                    }
+                )
+            elif self.args.is_multi_parent is True and self.args.wandb == 1:
                 wandb.log({
                     'train_loss': (train_loss),
                     'SVGD_Gradient_NORM': (svgd_loss),
@@ -301,17 +316,14 @@ class Experiments(object):
             print(sorted_scores[:, :5])
 
             candidate_list = np.array(list(self.test_set.true_concept_set))
-            test_metrics = metrics_multi_p(
+            test_metrics = metrics_multi_modal(
                 indices, gt_label, candidate_list, self.test_set.id_concept, self.test_set.test_concepts_id)
 
-            print('Hit@1:{:.05f}'.format(test_metrics["Prec@1"]),
-                  'mrr:{:.05f}'.format(test_metrics["MRR"]),
-                  'Recall@1:{:.05f}'.format(test_metrics["Recall@1"]),
-                  'mr:{:.05f}'.format(test_metrics["MR"]),
-                  'Hit@5:{:.05f}'.format(test_metrics["Prec@5"]),
-                  'Hit@10:{:.05f}'.format(test_metrics["Prec@10"]),
-                  'Recall@5:{:.05f}'.format(test_metrics["Recall@5"]),
-                  'Recall@10: {:.05f}'.format(test_metrics["Recall@10"]))
+            print('Precision:{:.05f}'.format(test_metrics["Precision"]),
+                  'Recall:{:.05f}'.format(test_metrics["Recall"]),
+                  "F1:{:.05f}".format(test_metrics['f1']),
+                  "MRR:{:.05f}".format(test_metrics['mrr']),
+                  "mr:{:.05f}".format(test_metrics['mr']))
 
         # results_json_dir = f'../results/{self.args.dataset}/{self.args.exp_name}'
         # if not os.path.exists(results_json_dir):

@@ -163,10 +163,10 @@ def experiment(args):
 if __name__ == '__main__':
     args.gpu_id = 1
     args.expID = 20
-    args.batch_size = 256
+    args.batch_size = 1024
     args.accumulation_steps = 5
     args.geometric_weight = 0.7
-    # args.c = 0.4
+    args.c = 0.4
     args.vmf_margin = 0.3
     args.svgd_weight = 0.1
     if args.dataset == 'mesh':
@@ -176,9 +176,10 @@ if __name__ == '__main__':
     elif args.dataset == 'wordnet_verb':
         args.negsamples = 20
         args.epochs = 30
-        args.embed_size = 256
+        args.embed_size = 512
     elif args.dataset == 'birds':
-        args.epochs = 75
+        args.negsamples = 5
+        args.epochs = 55
         args.embed_size = 512
     elif args.dataset == 'semeval_food':
         args.gpu_id = 1
@@ -201,13 +202,15 @@ if __name__ == '__main__':
             args.negsamples = 10
         elif args.dataset == 'science':
             args.embed_size = 512
-            args.batch_size = 512
-            args.gpu_id = 1
+            args.batch_size = 256
+            args.epochs = 50
+            args.gpu_id = 0
             args.beta = 0.3
         elif args.dataset == 'environment':
             args.embed_size = 512
-            args.batch_size = 256
-            args.gpu_id = 1
+            args.batch_size = 128
+            args.gpu_id = 0
+            args.epochs = 50
             args.beta = 0.3
 
     experiment(args)

@@ -127,3 +127,40 @@ class SVGD_IMQ_Sphere:
             (torch.sum(svgd_grad * x, dim=1, keepdim=True) * x)
 
         return tangent_grad
+
+
+class SVGD_Periodic:
+
+    def __init__(self, n_particles, bandwidth=None):
+        self.n_particles = n_particles
+        self.bandwidth = bandwidth
+
+    def periodic_kernel(self, x):
+        diff = torch.abs(x.unsqueeze(1) - x.unsqueeze(0))
+
+        dist = torch.min(diff, 2 * torch.pi - diff)
+        sq_dist = dist ** 2
+
+        if self.bandwidth is None:
+            h = torch.median(
+                sq_dist) / (2 * torch.log(torch.tensor(self.n_particles + 1.0)))
+            h = torch.sqrt(h + 1e-6)
+        else:
+            h = self.bandwidth
+
+        k = torch.exp(-sq_dist / (2 * h**2 + 1e-6))
+
+        x_expanded = x.unsqueeze(1)
+        y_expanded = x.unsqueeze(0)
+        delta = torch.remainder(
+            x_expanded - y_expanded + torch.pi, 2 * torch.pi) - torch.pi
+
+        grad_k = -(delta * k.unsqueeze(-1)) / (h**2 + 1e-6)
+
+        return k, grad_k
+
+    def __call__(self, x):
+        k, grad_k = self.periodic_kernel(x)
+
+        svgd_grad = torch.sum(grad_k, dim=1) / self.n_particles
+        return svgd_grad

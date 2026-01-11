@@ -96,6 +96,8 @@ parser.add_argument('--learn_mu', type=int, default=1,
                     help='If mu needs to be learned during training')
 parser.add_argument('--learn_kappa', type=int, default=1,
                     help='If kappa parameter of VMF needs to be learned during training')
+parser.add_argument('--implement_rectangular_opt', type=bool, default=False,
+                    help='Optimizes parameters on a Grid instead of a Sphere')
 
 
 start_time = time.time()
@@ -163,7 +165,7 @@ def experiment(args):
 if __name__ == '__main__':
     args.gpu_id = 1
     args.expID = 20
-    args.batch_size = 1024
+    args.batch_size = 512
     args.accumulation_steps = 5
     args.geometric_weight = 0.7
     args.c = 0.4
@@ -202,9 +204,9 @@ if __name__ == '__main__':
             args.negsamples = 10
         elif args.dataset == 'science':
             args.embed_size = 512
-            args.batch_size = 256
+            args.batch_size = 512
             args.epochs = 50
-            args.gpu_id = 0
+            args.gpu_id = 1
             args.beta = 0.3
         elif args.dataset == 'environment':
             args.embed_size = 512

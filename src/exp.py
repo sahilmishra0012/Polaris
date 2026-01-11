@@ -12,7 +12,7 @@ from utils import *
 from data import *
 from model import PolarTaxo
 import matplotlib.pyplot as plt
-from optimizer import RiemannianAdam
+from optimizer import RiemannianAdam, PolarEmbeddingsOptimizer
 from matplotlib.patches import Ellipse
 from sklearn.decomposition import PCA
 import gc
@@ -82,10 +82,16 @@ class Experiments(object):
     def _select_optimizer(self):
         parameters = [{"params": [p for n, p in self.model.named_parameters()],
                        "weight_decay": 0.0},]
+        if self.args.implement_rectangular_opt is True:
+            # Name parameters based on latitude or longitude
+            # param_groups = build_param_groups(
+            #     self.model, lr=self.args.lr, weight_decay=0.01)
+            # optimizer = PolarEmbeddingsOptimizer(
+            #     params=param_groups, lr=self.args.lr, eps=self.args.eps, betas=(0.9, 0.999), weight_decay=0.01)
+            optimizer = optim.AdamW(
+                params=parameters, lr=self.args.lr, weight_decay=0.01)
+        else:
 
-        if self.args.optim == "adam":
-            optimizer = optim.Adam(parameters, lr=self.args.lr)
-        elif self.args.optim == "adamw":
             optimizer = RiemannianAdam(
                 params=parameters, lr=self.args.lr, eps=self.args.eps, betas=(0.9, 0.999))
 
@@ -116,7 +122,8 @@ class Experiments(object):
 
         self.optimizer.step()
 
-        self.model.normalize_spherical_weights()
+        if self.args.implement_rectangular_opt is False:
+            self.model.normalize_spherical_weights()
         self.optimizer.zero_grad()
 
         del encode_parent, encode_child, encode_negative
@@ -163,14 +170,19 @@ class Experiments(object):
             svgd_loss = np.average(svgd_losses)
             print("Loss: ", train_loss)
 
-            if self.args.dataset == 'birds':
-                test_metrics = self.predict_multimodal()
-                test_acc = test_metrics['Precision']
-                test_mrr = test_metrics['mrr']
-            else:
-                test_metrics = self.predict()
+            if self.args.implement_rectangular_opt is True:
+                test_metrics = self.predict_rectangular()
                 test_acc = test_metrics["Prec@1"]
                 test_mrr = test_metrics["MRR"]
+            else:
+                if self.args.dataset == 'birds':
+                    test_metrics = self.predict_multimodal()
+                    test_acc = test_metrics['Precision']
+                    test_mrr = test_metrics['mrr']
+                else:
+                    test_metrics = self.predict()
+                    test_acc = test_metrics["Prec@1"]
+                    test_mrr = test_metrics["MRR"]
 
             if test_acc >= old_test_acc or test_mrr >= old_test_mrr:
                 final_res_dir = f"../final_result/{self.args.dataset}/{self.args.exp_name}"
@@ -335,6 +347,97 @@ class Experiments(object):
         #         "Test Metrics": test_metrics,
         #     }
         #     json.dump(expt_details, f, indent=4)
+
+        return test_metrics
+
+    def predict_rectangular(self, tag=None, path=None):
+        print("prediction starting....")
+
+        store_csv = False
+        if tag == "test" and path:
+            self.model.load_state_dict(torch.load(path))
+            store_csv = True
+
+        self.model.eval()
+        with torch.no_grad():
+            score_list = []
+            gt_label = self.test_set.test_gt_id
+
+            q_psi, q_theta = self.model.direct_projection_child(
+                self.test_set.encode_query)
+            q_angles = torch.cat([q_psi, q_theta], dim=1)
+            q_sphere = spherical_to_cartesian(q_angles)
+
+            candidates_sphere = list()
+
+            for encode_candidate in self.test_loader:
+                candidate_psi, candidate_theta = self.model.direct_projection_parent(
+                    encode_candidate)
+                candidate_angles = torch.cat(
+                    [candidate_psi, candidate_theta], dim=1)
+                candidate_sphere = spherical_to_cartesian(candidate_angles)
+
+                candidates_sphere.append(candidate_sphere)
+            candidates_sphere = torch.cat(candidates_sphere, dim=0)
+
+            num_queries = q_psi.size(0)
+            num_candidates = candidates_sphere.size(0)
+
+            for i in tqdm(range(num_queries), desc='evaluating queries'):
+                q_sphere = q_sphere[i].unsqueeze(0).expand(num_candidates, -1)
+
+                score = torch.sum(q_sphere*candidates_sphere, dim=1)
+                score_list.append(score)
+
+            score_matrix = torch.stack(score_list, dim=0)
+            print("Score matrix size:", score_matrix.size())
+            sorted_scores, indices = score_matrix.sort(dim=1, descending=True)
+            print(sorted_scores[:, :5])
+
+            if self.args.is_multi_parent is True:
+                candidate_list = np.array(list(self.test_set.true_concept_set))
+                test_metrics = metrics_multi_p(
+                    indices, gt_label, candidate_list, self.test_set.id_concept, self.test_set.test_concepts_id)
+
+                print('Hit@1:{:.05f}'.format(test_metrics["Prec@1"]),
+                      'mrr:{:.05f}'.format(test_metrics["MRR"]),
+                      'Recall@1:{:.05f}'.format(test_metrics["Recall@1"]),
+                      'mr:{:.05f}'.format(test_metrics["MR"]),
+                      'Hit@5:{:.05f}'.format(test_metrics["Prec@5"]),
+                      'Hit@10:{:.05f}'.format(test_metrics["Prec@10"]),
+                      'Recall@5:{:.05f}'.format(test_metrics["Recall@5"]),
+                      'Recall@10: {:.05f}'.format(test_metrics["Recall@10"]))
+            else:
+                test_metrics = metrics(
+                    indices,
+                    gt_label,
+                    self.train_set.train_concept_set,
+                    self.test_set.path2root,
+                    self.test_set.id_concept,
+                    self.train_set.id_concept,
+                    self.test_set.test_concepts_id,
+                    sorted_scores
+                )
+
+                print('Hit@1:{:.05f}'.format(test_metrics["Prec@1"]),
+                      'mrr:{:.05f}'.format(test_metrics["MRR"]),
+                      'Recall@1:{:.05f}'.format(test_metrics["Recall@1"]),
+                      'mr:{:.05f}'.format(test_metrics["MR"]),
+                      'prec@5:{:.05f}'.format(test_metrics["Prec@5"]),
+                      'prec@10:{:.05f}'.format(test_metrics["Prec@10"]),
+                      'Recall@5:{:.05f}'.format(test_metrics["Recall@5"]),
+                      'Recall@10: {:.05f}'.format(test_metrics["Recall@10"]))
+
+        results_json_dir = f'../results/{self.args.dataset}/{self.args.exp_name}'
+        if not os.path.exists(results_json_dir):
+            os.makedirs(results_json_dir, exist_ok=True)
+        with open(f'../results/{self.args.dataset}/{self.args.exp_name}/res_{self.exp_setting}.json', 'a+') as f:
+            d = vars(self.args)
+            expt_details = {
+                "Arguments": d,
+                "Test Metrics": test_metrics,
+            }
+            json.dump(expt_details, f, indent=4)
 
         return test_metrics
 
@@ -512,9 +615,9 @@ class Experiments(object):
                 query_radius = candidate_depths+1
                 candidate_updated_radius = (
                     candidate_depths+1)+((torch.log1p(candidate_descendants))/torch.log(torch.tensor(2)))
-                query_radius_normalized = 1 -\
+                query_radius_normalized = 1 - \
                     ((query_radius-score_min)/(score_range))
-                candidate_radius_normalized = 1 -\
+                candidate_radius_normalized = 1 - \
                     ((candidate_updated_radius-score_min)/(score_range))
 
                 radius_diff = torch.abs(

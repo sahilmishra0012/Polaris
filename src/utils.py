@@ -11,6 +11,44 @@ from sklearn.decomposition import PCA
 import plotly.graph_objects as go
 
 
+def build_param_groups(model, lr, weight_decay):
+    lat_params = []
+    long_params = []
+    euclidean_params = []
+
+    for name, param in model.named_parameters():
+        if not param.requires_grad:
+            continue
+
+        if "theta" in name:
+            long_params.append(param)
+        elif "psi" in name:
+            lat_params.append(param)
+        else:
+            euclidean_params.append(param)
+
+    return [
+        {
+            'params': lat_params,
+            'lr': lr,
+            'weight_decay': weight_decay,
+            'polar_mode': 'lat'
+        },
+        {
+            'params': long_params,
+            'lr': lr,
+            'weight_decay': weight_decay,
+            'polar_mode': 'long'
+        },
+        {
+            'params': euclidean_params,
+            'lr': lr,
+            'weight_decay': weight_decay,
+            'polar_mode': 'euclidean'
+        }
+    ]
+
+
 def plot_concept_space_map(query_info, predicted_info, ground_truth_info, save_path):
 
     plt.style.use('dark_background')
@@ -461,6 +499,24 @@ def bert_embedding_to_spherical(e):
     psi_out = angles[:, :-1]
 
     return theta_out, psi_out
+
+
+def spherical_to_cartesian(angles, radius=1.0):
+    sin_angles = torch.sin(angles)
+    cos_angles = torch.cos(angles)
+
+    cum_sin = torch.cumprod(sin_angles, dim=1)
+
+    ones = torch.ones(angles.size(0), 1, device=angles.device)
+    sin_prefix = torch.cat((ones, cum_sin[:, :-1]), dim=1)
+
+    coords_most = cos_angles * sin_prefix
+
+    coord_last = cum_sin[:, -1].unsqueeze(1)
+
+    cartesian = torch.cat((coords_most, coord_last), dim=1)
+
+    return cartesian * radius
 
 
 def set_seed(seed):

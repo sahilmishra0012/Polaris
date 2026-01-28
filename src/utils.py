@@ -9,6 +9,82 @@ import matplotlib.pyplot as plt
 import os
 from sklearn.decomposition import PCA
 import plotly.graph_objects as go
+import umap
+from sklearn.cluster import KMeans
+import seaborn as sns
+from adjustText import adjust_text
+
+
+def visualize_concept_clusters(embeddings, concept_ids, id_to_name_map, save_path, n_clusters=12):
+
+    print(f"Generating UMAP plot for {len(embeddings)} concepts...")
+
+    if torch.is_tensor(embeddings):
+        data = embeddings.cpu().numpy()
+    else:
+        data = embeddings
+
+    reducer = umap.UMAP(n_neighbors=15, min_dist=0.1,
+                        n_components=2, metric='cosine', random_state=42)
+    embedding_2d = reducer.fit_transform(data)
+
+    kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
+    labels = kmeans.fit_predict(data)
+
+    plt.figure(figsize=(18, 14))
+    sns.set_style("whitegrid")
+    palette = sns.color_palette("bright", n_clusters)
+
+    sns.scatterplot(
+        x=embedding_2d[:, 0], y=embedding_2d[:, 1],
+        hue=labels, palette=palette, legend="full",
+        s=100, alpha=0.7, edgecolor='w'
+    )
+
+    texts = []
+    for i in range(n_clusters):
+        indices = np.where(labels == i)[0]
+        if len(indices) == 0:
+            continue
+
+        cluster_points = embedding_2d[indices]
+        centroid = np.mean(cluster_points, axis=0)
+
+        dists = np.linalg.norm(cluster_points - centroid, axis=1)
+        center_idx = indices[np.argmin(dists)]
+
+        cid = concept_ids[center_idx]
+        name = id_to_name_map.get(cid, str(cid))
+
+        texts.append(plt.text(
+            embedding_2d[center_idx, 0], embedding_2d[center_idx, 1],
+            name.upper(), fontsize=11, weight='bold', color='black',
+            bbox=dict(boxstyle="round,pad=0.2",
+                      fc="white", ec="black", alpha=0.8)
+        ))
+
+        if len(indices) > 5:
+            sample_idxs = np.random.choice(
+                indices, min(3, len(indices)), replace=False)
+            for idx in sample_idxs:
+                if idx == center_idx:
+                    continue
+                sub_cid = concept_ids[idx]
+                sub_name = id_to_name_map.get(sub_cid, str(sub_cid))
+                texts.append(plt.text(
+                    embedding_2d[idx, 0], embedding_2d[idx, 1],
+                    sub_name, fontsize=9, alpha=0.8, color='#333333'
+                ))
+
+    print("Adjusting labels (this may take a moment)...")
+    adjust_text(texts, arrowprops=dict(arrowstyle='-',
+                color='gray', lw=0.5), force_text=(0.2, 0.5))
+
+    plt.title("Concept Space Clustering", fontsize=20)
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=300)
+    plt.close()
+    print(f"Plot saved to {save_path}")
 
 
 def build_param_groups(model, lr, weight_decay):

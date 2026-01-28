@@ -35,11 +35,6 @@ class PolarTaxo(nn.Module):
             input_dim=self.input_dim, hidden=self.args.hidden, output_dim=self.args.embed_size, bias=False)
         self.parent_sphere = SphericalMLP(
             input_dim=self.input_dim, hidden=self.args.hidden, output_dim=self.args.embed_size, bias=False)
-
-        self.child_rect = MLP(
-            input_dim=self.input_dim-2, hidden=self.args.hidden, output_dim=self.args.embed_size)
-        self.parent_rect = MLP(
-            input_dim=self.input_dim-2, hidden=self.args.hidden, output_dim=self.args.embed_size)
         pole = torch.zeros(self.input_dim)
         pole[-1] = 1.0
         self.register_buffer("pole", pole.unsqueeze(0))

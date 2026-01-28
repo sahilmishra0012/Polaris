@@ -744,6 +744,73 @@ def preprocess(args, outID=True):
             child, parent = process_pair(pair, dataset)
             all_taxo_dict[concept_id[parent]].append(concept_id[child])
 
+    print("Calculating radii based on depth and descendants using single-step normalization...")
+
+    all_children_nodes = {child for parent,
+                          children in all_taxo_dict.items() for child in children}
+    roots = concept_set - all_children_nodes
+    print(f"Found {len(roots)} root nodes for depth calculation.")
+
+    depths = {}
+    queue = deque([(root, 1) for root in roots])
+    visited_for_depth = set(roots)
+
+    for root in roots:
+        depths[root] = 1
+
+    while queue:
+        current_node, current_depth = queue.popleft()
+        children = all_taxo_dict.get(current_node, [])
+        for child in children:
+            if child not in visited_for_depth:
+                visited_for_depth.add(child)
+                depths[child] = current_depth + 1
+                queue.append((child, current_depth + 1))
+    print("Node depth calculation complete.")
+
+    memo = {}
+
+    def get_all_descendants(start_node):
+        if start_node in memo:
+            return memo[start_node]
+        descendants = set()
+        queue = deque(all_taxo_dict.get(start_node, []))
+        visited = set(queue)
+        while queue:
+            current_node = queue.popleft()
+            descendants.add(current_node)
+            children = all_taxo_dict.get(current_node, [])
+            for c in children:
+                if c not in visited:
+                    visited.add(c)
+                    queue.append(c)
+        memo[start_node] = descendants
+        return descendants
+
+    raw_scores = {}
+    for node in tqdm(concept_set, desc="Calculating raw scores (h + log(l+1))"):
+        h = depths.get(node, 1)
+        l = len(get_all_descendants(node))
+        raw_scores[node] = h + (np.log1p(l)/np.log(2))
+
+    all_raw_values = list(raw_scores.values())
+    raw_score_min = min(all_raw_values)
+    raw_score_max = max(all_raw_values)
+    raw_score_range = raw_score_max - \
+        raw_score_min if raw_score_max > raw_score_min else 1.0
+
+    normalized_radii = {
+        node: {'radii': 1.0 - ((score - raw_score_min) / raw_score_range),
+               'depth': depths.get(node),
+               'descendents': len(get_all_descendants(node)),
+               'raw_score_min': raw_score_min,
+               'raw_score_range': raw_score_range,
+               }
+        for node, score in raw_scores.items()
+    }
+
+    print("Final normalized radii calculation complete.")
+
     train_taxonomy_file = os.path.join(
         f"../data/{dataset}/{dataset}_train.taxo")
     train_taxonomy = load_file(train_taxonomy_file)
@@ -882,7 +949,7 @@ def preprocess(args, outID=True):
         negative_parent_dict, child_parent_negative_parent_triple, parent_list, child_list,
         negative_parent_list, sibling_dict, cousin_dict, relative_triple, test_concepts_id,
         test_gt_id, all_taxo_dict, path2root, sib_pair, child_parent_pair, child_neg_parent_pair,
-        child_sibling_pair, val_concept, val_gt, test_concept, test_gt
+        child_sibling_pair, val_concept, val_gt, test_concept, test_gt, normalized_radii
     )
 
 
@@ -971,7 +1038,7 @@ def create_data(args, maxlimit=None):
 
     concept_set, concept_id, id_concept, id_context, train_concept_set, train_taxo_dict, negative_parent_dict, train_child_parent_negative_parent_triple, train_parent_list, \
         train_child_list, train_negative_parent_list, train_sibling_dict, train_cousin_dict, train_relative_triple, test_concepts_id, test_gt_id, \
-        all_taxo_dict, path2root, sib_pair, child_parent_pair, child_neg_parent_pair, child_sibling_pair, val_concept, val_gt, test_concept, test_gt = preprocess(
+        all_taxo_dict, path2root, sib_pair, child_parent_pair, child_neg_parent_pair, child_sibling_pair, val_concept, val_gt, test_concept, test_gt, levels = preprocess(
             args)
 
     print("Waiting for preprocess data....")
@@ -1003,7 +1070,8 @@ def create_data(args, maxlimit=None):
         "val_concept": val_concept,
         "val_gt": val_gt,
         "test_concept": test_concept,
-        "test_gt": test_gt}
+        "test_gt": test_gt,
+        "node_levels":levels,}
 
     with open("../data/"+str(args.dataset)+"/processed/taxonomy_data_"+str(args.expID)+str(args.negsamples)+str(args.seed)+"_.pkl", "wb") as f:
         pkl.dump(save_data, f)

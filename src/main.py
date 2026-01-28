@@ -164,7 +164,7 @@ def experiment(args):
 # Additional Config
 if __name__ == '__main__':
     args.gpu_id = 1
-    args.expID = 20
+    args.expID = 50
     args.batch_size = 512
     args.accumulation_steps = 5
     args.geometric_weight = 0.7
@@ -195,15 +195,20 @@ if __name__ == '__main__':
     elif args.dataset == 'science' or args.dataset == 'environment' or args.dataset == 'wordnet':
         args.is_multi_parent = False
         args.epochs = 90
-        args.accumulation_steps = 5
+        args.accumulation_steps = 2
         args.negsamples = 50
         args.kappa_align = 1.0
         args.kappa_repel = 2.0
         if args.dataset == 'wordnet':
+            args.batch_size = 256
+            args.kappa_align = 2
+            args.kappa_repel = 4
             args.embed_size = 128
-            args.negsamples = 10
+            args.negsamples = 15
+            args.epochs = 100
+            args.gpu_id = 2
         elif args.dataset == 'science':
-            args.embed_size = 512
+            args.embed_size = 256
             args.batch_size = 512
             args.epochs = 50
             args.gpu_id = 1

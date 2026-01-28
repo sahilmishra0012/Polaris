@@ -611,6 +611,7 @@ class Data_TEST(Dataset):
 
         self.encode_query = self.generate_test_token_ids(
             self.tokenizer, self.test_concepts_id)
+        self.levels = self.data['node_levels']
 
     def __load_data__(self, dataset):
 

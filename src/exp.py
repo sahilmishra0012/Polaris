@@ -54,14 +54,6 @@ class Experiments(object):
         self.exp_setting = "_".join([str(elem) for elem in [self.args.dataset, self.args.expID,
                                                             self.args.beta, self.args.embed_size, self.args.geometric_weight, self.args.c, self.args.vmf_margin, self.args.kappa_repel, self.args.kappa_align, self.args.kernel_setting, self.args.svgd_weight, self.args.seed]])
         self.grad_logger = GradientLogger()
-        # setting = {
-        #     "dataset": self.args.dataset,
-        #     "expID": self.args.expID,
-        #     'beta': self.args.beta,
-        #     'embed_size': self.args.embed_size,
-        #     'seed': self.args.seed,
-        #     'c': self.args.c
-        # }
         print(self.args)
 
     def __load_tokenizer__(self):
@@ -83,11 +75,6 @@ class Experiments(object):
         parameters = [{"params": [p for n, p in self.model.named_parameters()],
                        "weight_decay": 0.0},]
         if self.args.implement_rectangular_opt is True:
-            # Name parameters based on latitude or longitude
-            # param_groups = build_param_groups(
-            #     self.model, lr=self.args.lr, weight_decay=0.01)
-            # optimizer = PolarEmbeddingsOptimizer(
-            #     params=param_groups, lr=self.args.lr, eps=self.args.eps, betas=(0.9, 0.999), weight_decay=0.01)
             optimizer = optim.AdamW(
                 params=parameters, lr=self.args.lr, weight_decay=0.01)
         else:
@@ -109,7 +96,6 @@ class Experiments(object):
             it, encode_parent, encode_child, encode_negative)
         taxo_grads_to_log = None
         if it == len(self.train_loader)-1:
-            # Calculate gradient norm for taxonomy and geometric loss
             final_embedding_layers = [
                 ("par_projection.weight", self.model.parent_sphere.l2.weight),
                 ('child_projection.weight', self.model.child_sphere.l2.weight)
@@ -249,10 +235,6 @@ class Experiments(object):
             torch.save(self.model.state_dict(), os.path.join(
                 traindir, f"experiment_{self.exp_setting}.checkpoint"))
 
-            # Log to wandb and keep a copy locally
-            # if taxo_grad_log is not None:
-            #     wandb.log(taxo_grad_log)
-
             gradient_logs = f'../gradients/{self.args.dataset}/{self.args.exp_name}'
             if not os.path.exists(gradient_logs):
                 os.makedirs(gradient_logs, exist_ok=True)
@@ -282,7 +264,6 @@ class Experiments(object):
             score_list = []
             gt_label = self.test_set.test_gt_id
 
-            # Query is an image embedding batch
             q_sphere = self.model.multimodal_child_projection(
                 self.test_set.encode_query)
             q_k = self.model.vmf_regulariser.kappa_predictor(q_sphere)
@@ -313,8 +294,6 @@ class Experiments(object):
 
             for i in tqdm(range(num_queries), desc='Evaluating Queries'):
                 q_sph = q_sphere[i].unsqueeze(0).expand(num_candidates, -1)
-                # q_mu = q_mu[i].unsqueeze(0).expand(num_candidates, -1)
-                # q_k = q_k[i].unsqueeze(0).expand(num_candidates, -1)
 
                 geometric_score = torch.sum(candidates_sphere*q_sph, dim=1)
 
@@ -336,17 +315,6 @@ class Experiments(object):
                   "F1:{:.05f}".format(test_metrics['f1']),
                   "MRR:{:.05f}".format(test_metrics['mrr']),
                   "mr:{:.05f}".format(test_metrics['mr']))
-
-        # results_json_dir = f'../results/{self.args.dataset}/{self.args.exp_name}'
-        # if not os.path.exists(results_json_dir):
-        #     os.makedirs(results_json_dir, exist_ok=True)
-        # with open(f'../results/{self.args.dataset}/{self.args.exp_name}/res_{self.exp_setting}.json', 'a+') as f:
-        #     d = vars(self.args)
-        #     expt_details = {
-        #         "Arguments": d,
-        #         "Test Metrics": test_metrics,
-        #     }
-        #     json.dump(expt_details, f, indent=4)
 
         return test_metrics
 
@@ -568,8 +536,14 @@ class Experiments(object):
             candidates_mu_list = list()
             candidates_k_list = list()
 
-            candidate_list = np.array(
-                sorted(list(self.test_set.true_concept_set)))
+            if self.args.is_multi_parent == True:
+
+                candidate_list = np.array(
+                    sorted(list(self.test_set.true_concept_set)))
+            else:
+                candidate_list = np.array(
+                    sorted(list(self.train_set.train_concept_set)))
+
             for encode_candidate in self.test_loader:
                 candidate_z = self.model.par_projection(encode_candidate)
                 candidate_mu = self.model.vmf_regulariser.mu_predictor(
@@ -612,20 +586,24 @@ class Experiments(object):
                 angular_score = dot_product / \
                     ((norm_q * norm_candidates) + epsilon)
 
-                query_radius = candidate_depths+1
+                query_radius = (
+                    candidate_depths+1)
                 candidate_updated_radius = (
-                    candidate_depths+1)+((torch.log1p(candidate_descendants))/torch.log(torch.tensor(2)))
+                    candidate_depths)+((torch.log1p(candidate_descendants+1))/torch.log(torch.tensor(2)))
                 query_radius_normalized = 1 - \
                     ((query_radius-score_min)/(score_range))
                 candidate_radius_normalized = 1 - \
                     ((candidate_updated_radius-score_min)/(score_range))
 
+                # score_beta = 5.0
                 radius_diff = torch.abs(
                     candidate_radius_normalized-query_radius_normalized)
 
                 radius_score = torch.where(
-                    angular_score > 1-(radius_diff**2), 1.0, 0.0)
+                    angular_score > 1-(5*(radius_diff**2)), 1.0, 0.0)
                 final_score = radius_score*angular_score
+                # radial_score = torch.exp(-score_beta*(radius_diff**2))
+                # final_score = radial_score*angular_score
 
                 score_list.append(final_score)
                 candidate_radii_list.append(candidate_radius_normalized)
@@ -647,6 +625,8 @@ class Experiments(object):
 
                 gt_ids = self.test_set.test_gt_id[i]
                 ground_truth_info = []
+                if self.args.is_multi_parent is False:
+                    gt_ids = [gt_ids]
                 if gt_ids:
                     gt_indices = [np.where(candidate_list == gid)[0][0]
                                   for gid in gt_ids if gid in candidate_list]
@@ -678,7 +658,8 @@ class Experiments(object):
                     plot_concept_space_map(
                         query_info, predicted_info, ground_truth_info, plot_save_path)
 
-            print(f"Plots saved in '../results/{self.args.dataset}/plots/'")
+                    print(
+                        f"Plots saved in '../results/{self.args.dataset}/plots/'")
 
             if self.args.is_multi_parent is True:
                 candidate_list = np.array(list(self.test_set.true_concept_set))
@@ -819,3 +800,40 @@ class Experiments(object):
             plt.show()
 
             print(f"Plots saved to {save_path}")
+
+    def generate_embeddings_and_plot(self, path=None, n_clusters=15):
+        print("Visualization: Loading model and generating embeddings...")
+
+        if path:
+            print(f"Loading weights from {path}")
+            self.model.load_state_dict(torch.load(path))
+
+        self.model.eval()
+
+        with torch.no_grad():
+            candidates_sphere = list()
+
+            if self.args.dataset in ['mesh', 'wordnet_verb', 'semeval_food']:
+                concept_ids = np.array(
+                    sorted(list(self.test_set.true_concept_set)))
+            else:
+                concept_ids = np.array(
+                    sorted(list(self.train_set.train_concept_set)))
+
+            for encode_candidate in self.test_loader:
+                candidate_z = self.model.par_projection(encode_candidate)
+                candidates_sphere.append(candidate_z)
+
+            candidates_sphere = torch.cat(candidates_sphere, dim=0)
+
+        save_path = f'{self.args.dataset}_concept_clusters_umap.png'
+
+        # os.makedirs(os.path.dirname(save_path), exist_ok=True)
+
+        visualize_concept_clusters(
+            embeddings=candidates_sphere,
+            concept_ids=concept_ids,
+            id_to_name_map=self.test_set.id_concept,
+            save_path=save_path,
+            n_clusters=n_clusters
+        )

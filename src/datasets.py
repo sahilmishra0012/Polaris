@@ -495,5 +495,3 @@ class MAGDataset(object):
 if __name__ == '__main__':
     MAGDataset(name='semeval_food', path="../data/semeval_food",
                existing_partition=False, partition_pattern='leaf')
-    # BirdsImagesDataset(
-    #     edges_path='/home/nitish/Polartaxo/data/birds/birds.taxo')

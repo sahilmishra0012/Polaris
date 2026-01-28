@@ -113,7 +113,7 @@ def experiment(args):
 
     if args.wandb == 1 and args.resume == 'no':
         wandb.init(
-            project='PolarTaxo',
+            project='Polaris',
 
             name=f'{args.exp_name}-{args.dataset}',
             config=args,
@@ -123,7 +123,7 @@ def experiment(args):
     if args.resume == 'must':
         run = wandb.init(
             entity=args.entity,
-            project='PolarTaxo',
+            project='Polaris',
             id=args.run_id,
             resume='must'
         )
@@ -161,7 +161,6 @@ def experiment(args):
     print("************END***************")
 
 
-# Additional Config
 if __name__ == '__main__':
     args.gpu_id = 1
     args.expID = 50
@@ -174,21 +173,21 @@ if __name__ == '__main__':
     if args.dataset == 'mesh':
         args.negsamples = 20
         args.epochs = 50
-        args.embed_size = 512
+        args.embed_size = 128
     elif args.dataset == 'wordnet_verb':
         args.negsamples = 20
         args.epochs = 30
-        args.embed_size = 512
+        args.embed_size = 256
     elif args.dataset == 'birds':
         args.negsamples = 5
         args.epochs = 55
-        args.embed_size = 512
+        args.embed_size = 64
     elif args.dataset == 'semeval_food':
         args.gpu_id = 1
         args.epochs = 200
         args.negsamples = 20
         args.geometric_weight = 0.7
-        args.embed_size = 512
+        args.embed_size = 64
         args.beta = 0.3
         args.kappa_align = 1.0
         args.kappa_repel = 2.0
@@ -200,7 +199,7 @@ if __name__ == '__main__':
         args.kappa_align = 1.0
         args.kappa_repel = 2.0
         if args.dataset == 'wordnet':
-            args.batch_size = 256
+            args.batch_size = 64
             args.kappa_align = 2
             args.kappa_repel = 4
             args.embed_size = 128
@@ -208,13 +207,13 @@ if __name__ == '__main__':
             args.epochs = 100
             args.gpu_id = 2
         elif args.dataset == 'science':
-            args.embed_size = 256
-            args.batch_size = 512
+            args.embed_size = 64
+            args.batch_size = 128
             args.epochs = 50
             args.gpu_id = 1
             args.beta = 0.3
         elif args.dataset == 'environment':
-            args.embed_size = 512
+            args.embed_size = 32
             args.batch_size = 128
             args.gpu_id = 0
             args.epochs = 50

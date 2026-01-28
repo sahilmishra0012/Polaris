@@ -77,7 +77,8 @@ parser.add_argument('--exp_name', type=str,
 parser.add_argument('--resume', type=str, default='no', help='Resume a run')
 parser.add_argument('--run_id', type=str, default='',
                     help='Wandb run id for resumption')
-parser.add_argument('--entity', type=str, default='uaena', help='wandb entity')
+parser.add_argument('--entity', type=str,
+                    default='entity', help='wandb entity')
 parser.add_argument('--checkpoint_path', type=str,
                     default=None, help='checkpoint path to resume training')
 parser.add_argument('--experiment_setting', type=str,
@@ -102,21 +103,7 @@ args.cuda = True  # inference
 torch.cuda.set_device(args.gpu_id)
 
 print(args)
-# set_seed(args.seed)
-
-# create_mag_data(args)
 exp = Experiments(args)
-# exp.visualize_angle_distributions(
-#     tag='test', path='/home/nitish/Polartaxo/final_result/mesh/svgd_and_no_svgd/experiment_mesh_14_45_512_0.5_512_0.7_0.4_0.3_4.5_2.5_vmf_theta_0.0.pt')
-# exp.level_wise_prediction(
-#     tag='test', path='/home/nitish/Polartaxo/final_result/mesh/independent_seed_runs/experiment_mesh_20_0.5_512_0.7_0.4_0.3_4.5_2.5_vmf_theta_0.1_40.pt')
-# exp.predict(tag='test', path='/home/nitish/Polartaxo/result/mesh/train/experiment_3_varied_geometric_weight/experiment_bert_mesh_2_60_1024_0.5_128_0.8_0.5.')
-# exp.predict_multimodal(
-#     tag='test', path='/home/nitish/Polartaxo/final_result/birds/independent_seed_runs/experiment_birds_20_0.5_512_0.7_0.4_0.3_4.5_2.5_vmf_theta_0.1_20.pt')
-# exp.generate_embeddings_and_plot(
-#     path='/home/nitish/Polartaxo/result/environment/train/independent_seed_runs/experiment_environment_20_0.3_512_0.7_0.4_0.3_2.0_1.0_vmf_theta_0.1_40.checkpoint', n_clusters=15)
-args.is_multi_parent = False
-# exp.level_wise_prediction(
-#     tag='test', path='/home/nitish/Polartaxo/result/science/train/independent_seed_runs/experiment_science_20_0.3_512_0.7_0.4_0.3_2.0_1.0_vmf_theta_0.1_30.checkpoint')
+
 exp.generate_embeddings_and_plot(
-    '/home/nitish/Polartaxo/result/science/train/independent_seed_runs/experiment_science_20_0.3_512_0.7_0.4_0.3_2.0_1.0_vmf_theta_0.1_30.checkpoint', n_clusters=23)
+    '../result/science/train/independent_seed_runs/experiment_science_20_0.3_512_0.7_0.4_0.3_2.0_1.0_vmf_theta_0.1_30.checkpoint', n_clusters=23)

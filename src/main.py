@@ -85,7 +85,8 @@ parser.add_argument('--exp_name', type=str,
 parser.add_argument('--resume', type=str, default='no', help='Resume a run')
 parser.add_argument('--run_id', type=str, default='',
                     help='Wandb run id for resumption')
-parser.add_argument('--entity', type=str, default='uaena', help='wandb entity')
+parser.add_argument('--entity', type=str,
+                    default='entity', help='wandb entity')
 parser.add_argument('--checkpoint_path', type=str,
                     default=None, help='checkpoint path to resume training')
 parser.add_argument('--experiment_setting', type=str,

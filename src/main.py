@@ -103,7 +103,7 @@ parser.add_argument('--implement_rectangular_opt', type=bool, default=False,
 
 start_time = time.time()
 print("Start time at : ")
-print_local_time()
+print_aoe_time()
 
 args = parser.parse_args()
 

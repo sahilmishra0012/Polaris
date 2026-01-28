@@ -3,7 +3,7 @@ import pandas as pd
 import random
 import torch
 import pytz
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import math
 import matplotlib.pyplot as plt
 import os
@@ -602,10 +602,11 @@ def set_seed(seed):
     torch.cuda.manual_seed_all(seed)
 
 
-def print_local_time():
+def print_aoe_time():
     utc_dt = datetime.now(timezone.utc)
-    PST = pytz.timezone('Asia/Kolkata')
-    print("Pacific time {}".format(utc_dt.astimezone(PST).isoformat()))
+    aoe_tz = timezone(timedelta(hours=-12))  # AoE = UTC - 12
+    aoe_dt = utc_dt.astimezone(aoe_tz)
+    print(f"AoE time {aoe_dt.isoformat()}")
     return
 
 

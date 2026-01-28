@@ -42,7 +42,7 @@ class PolarTaxo(nn.Module):
     def __load_pre_trained__(self):
         if self.args.model == 'bert':
             model = BertModel.from_pretrained(
-                '/home/models/bert-base-uncased')
+                'google-bert/bert-base-uncased')
         elif self.args.model == 'snowflake':
             model = AutoModel.from_pretrained(
                 'Snowflake/snowflake-arctic-embed-m', add_pooling_layer=False)

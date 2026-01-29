@@ -30,8 +30,3 @@ def create_image_triplets(image_path):
 
                 category_cleaned = re.sub(r'^\d+\.', '', category)
                 writer.writerow([image_absolute_path, category_cleaned])
-
-
-if __name__ == '__main__':
-    create_image_triplets(
-        '/home/nitish/dataset/birds/Birds/CUB_200_2011/CUB_200_2011/images')

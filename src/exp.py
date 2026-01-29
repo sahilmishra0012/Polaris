@@ -16,10 +16,13 @@ from optimizer import RiemannianAdam, PolarEmbeddingsOptimizer
 from matplotlib.patches import Ellipse
 from sklearn.decomposition import PCA
 import gc
+import pandas as pd
 import seaborn as sns
 from hooks import GradientLogger
 import csv
 import wandb
+import matplotlib.patches as mpatches
+import matplotlib.lines as mlines
 
 os.environ["WANDB_MODE"] = "online"
 
@@ -595,15 +598,12 @@ class Experiments(object):
                 candidate_radius_normalized = 1 - \
                     ((candidate_updated_radius-score_min)/(score_range))
 
-                # score_beta = 5.0
                 radius_diff = torch.abs(
                     candidate_radius_normalized-query_radius_normalized)
 
                 radius_score = torch.where(
                     angular_score > 1-(5*(radius_diff**2)), 1.0, 0.0)
                 final_score = radius_score*angular_score
-                # radial_score = torch.exp(-score_beta*(radius_diff**2))
-                # final_score = radial_score*angular_score
 
                 score_list.append(final_score)
                 candidate_radii_list.append(candidate_radius_normalized)
@@ -707,99 +707,88 @@ class Experiments(object):
 
     def visualize_angle_distributions(self, tag=None, path=None):
 
-        print("Starting global distribution analysis...")
+        print("Starting global distribution analysis for Candidates...")
         if tag == "test" and path:
             print(f"Loading model from: {path}")
             self.model.load_state_dict(torch.load(path))
 
+        sns.set_context("poster", font_scale=1.2)
+        sns.set_style("whitegrid", {'grid.linestyle': '--', 'grid.alpha': 0.6})
+        plt.rcParams.update({
+            'font.family': 'serif', 'font.weight': 'bold',
+            'axes.labelweight': 'bold', 'axes.titleweight': 'bold',
+            'axes.titlesize': 28, 'axes.labelsize': 24,
+            'xtick.labelsize': 20, 'ytick.labelsize': 20,
+            'legend.fontsize': 22, 'mathtext.fontset': 'dejavuserif',
+        })
+
+        candidate_color = '#029E73'
+
         self.model.eval()
         with torch.no_grad():
-            q_z = self.model.child_projection(self.test_set.encode_query)
-            q_sphere = self.model.vmf_regulariser.mu_predictor(q_z)
-            q_k = self.model.vmf_regulariser.kappa_predictor(q_z)
-
             candidates_sphere_list = []
-            candidates_k_list = []
             print("Processing all candidates...")
             for encode_candidate in tqdm(self.test_loader, desc='Loading Candidates'):
                 candidate_z = self.model.par_projection(encode_candidate)
                 candidate_sphere = self.model.vmf_regulariser.mu_predictor(
                     candidate_z)
-                candidate_k = self.model.vmf_regulariser.kappa_predictor(
-                    candidate_z)
                 candidates_sphere_list.append(candidate_sphere)
-                candidates_k_list.append(candidate_k)
 
             candidates_sphere = torch.cat(candidates_sphere_list, dim=0)
-            candidates_k = torch.cat(candidates_k_list, dim=0)
 
             print("All embeddings loaded. Calculating angles...")
-
-            q_thetas, q_psi1s, q_psi2s = cartesian_to_spherical_angles(
-                q_sphere)
-            c_thetas, c_psi1s, c_psi2s = cartesian_to_spherical_angles(
+            c_thetas, c_psi1s, c_psi2s, c_psid = cartesian_to_spherical_angles(
                 candidates_sphere)
 
             all_data = {
-                'query_theta': q_thetas.cpu().numpy(),
-                'query_psi1': q_psi1s.cpu().numpy(),
-                'query_psi2': q_psi2s.cpu().numpy(),
-                'query_k': q_k.cpu().numpy(),
-                'candidate_theta': c_thetas.cpu().numpy(),
-                'candidate_psi1': c_psi1s.cpu().numpy(),
-                'candidate_psi2': c_psi2s.cpu().numpy(),
-                'candidate_k': candidates_k.cpu().numpy(),
+                'candidate_theta': c_thetas.cpu().numpy(), 'candidate_psi1': c_psi1s.cpu().numpy(),
+                'candidate_psi2': c_psi2s.cpu().numpy(), 'candidate_psid': c_psid.cpu().numpy(),
             }
 
             print("Generating combined distribution plots...")
+            fig, axes = plt.subplots(1, 4, figsize=(26, 7), dpi=300)
 
-            fig, axes = plt.subplots(1, 4, figsize=(24, 6))
-            fig.suptitle(
-                'Global Distributions of Query vs. Candidate Angles and K-Values', fontsize=20)
+            plot_config = {
+                'kde': True, 'bins': 50, 'stat': 'density',
+                'element': 'step', 'fill': True, 'alpha': 0.5, 'linewidth': 2.0,
+            }
 
-            plot_config = {'kde': True, 'bins': 50}
+            plot_titles = [r"Longitudinal ($\theta$)", r"1st Latitudinal ($\psi_1$)",
+                           r"2nd Latitudinal ($\psi_2$)", r"Last Latitudinal ($\psi_{d-1}$)"]
+            plot_data_keys = ['candidate_theta', 'candidate_psi1',
+                              'candidate_psi2', 'candidate_psid']
+            x_limits = [(0, 2 * np.pi), (0, np.pi), (0, np.pi), (0, np.pi)]
 
-            sns.histplot(all_data['query_theta'], ax=axes[0],
-                         **plot_config, color='royalblue', label='Queries')
-            sns.histplot(all_data['candidate_theta'], ax=axes[0],
-                         **plot_config, color='darkorange', label='Candidates')
-            axes[0].set_title("Longitudinal Angle (θ)", fontsize=14)
-            axes[0].set_xlim(0, 2 * np.pi)
+            for i, ax in enumerate(axes):
+                sns.histplot(all_data[plot_data_keys[i]],
+                             ax=ax, **plot_config, color=candidate_color)
 
-            sns.histplot(all_data['query_psi1'], ax=axes[1], **
-                         plot_config, color='royalblue', label='Queries')
-            sns.histplot(all_data['candidate_psi1'], ax=axes[1], **
-                         plot_config, color='darkorange', label='Candidates')
-            axes[1].set_title("1st Latitudinal Angle (ψ1)", fontsize=14)
-            axes[1].set_xlim(0, np.pi)
+                ax.set_title(plot_titles[i])
+                ax.set_xlim(x_limits[i])
+                ax.set_ylabel('Density')
+                ax.set_xlabel('Angle (radians)')
 
-            sns.histplot(all_data['query_psi2'], ax=axes[2], **
-                         plot_config, color='royalblue', label='Queries')
-            sns.histplot(all_data['candidate_psi2'], ax=axes[2], **
-                         plot_config, color='darkorange', label='Candidates')
-            axes[2].set_title("2nd Latitudinal Angle (ψ2)", fontsize=14)
-            axes[2].set_xlim(0, np.pi)
-
-            sns.histplot(all_data['query_k'], ax=axes[3], **
-                         plot_config, color='royalblue', label='Queries')
-            sns.histplot(all_data['candidate_k'], ax=axes[3], **
-                         plot_config, color='darkorange', label='Candidates')
-            axes[3].set_title("K-Value (Concentration)", fontsize=14)
-
-            for i in range(4):
-                axes[i].set_ylabel('Frequency')
-                axes[i].legend()
-                if i < 3:
-                    axes[i].set_xlabel('Angle (radians)')
+                if i == 0:
+                    ax.axhline(y=1/(2*np.pi), color='gray',
+                               linestyle='--', alpha=0.7)
                 else:
-                    axes[i].set_xlabel('K Value')
+                    ax.axvline(x=np.pi/2, color='red',
+                               linestyle=':', alpha=0.7, linewidth=2.5)
 
-            plt.tight_layout(rect=[0, 0.03, 1, 0.95])
-            save_path = "global_angle_and_k_distributions.png"
-            plt.savefig(save_path)
-            plt.show()
+            candidate_patch = mpatches.Patch(
+                color=candidate_color, alpha=0.5, label='Candidates')
+            equator_line = mlines.Line2D(
+                [], [], color='red', linestyle=':', label='Equator')
 
+            fig.legend(handles=[candidate_patch, equator_line],
+                       loc='upper center', bbox_to_anchor=(0.5, 1.1),
+                       ncol=2, frameon=False)
+
+            plt.tight_layout()
+            save_path = f"candidate_angle_distributions_{self.args.dataset}.pdf"
+            plt.savefig(save_path, bbox_inches='tight')
             print(f"Plots saved to {save_path}")
+            plt.close()
 
     def generate_embeddings_and_plot(self, path=None, n_clusters=15):
         print("Visualization: Loading model and generating embeddings...")
@@ -828,8 +817,6 @@ class Experiments(object):
 
         save_path = f'{self.args.dataset}_concept_clusters_umap.png'
 
-        # os.makedirs(os.path.dirname(save_path), exist_ok=True)
-
         visualize_concept_clusters(
             embeddings=candidates_sphere,
             concept_ids=concept_ids,
@@ -837,3 +824,151 @@ class Experiments(object):
             save_path=save_path,
             n_clusters=n_clusters
         )
+
+    def analyze_variances(self, tag=None, path=None):
+
+        print("Starting variance analysis...")
+        if tag == "test" and path:
+            print(f"Loading model from: {path}")
+            self.model.load_state_dict(torch.load(path))
+
+        layers_to_analyze = {
+            "Projection Layer 1": self.model.parent_sphere.l1.weight.data.cpu().numpy(),
+            "Projection Later 2": self.model.parent_sphere.l2.weight.data.cpu().numpy()
+        }
+
+        variances = {}
+        all_weights = []
+        labels = []
+
+        print("\n--- Weight Variance Analysis ---")
+        for name, weights in layers_to_analyze.items():
+            flat_weights = weights.flatten()
+
+            var = np.var(flat_weights)
+            mean = np.mean(flat_weights)
+            variances[name] = var
+
+            all_weights.append(flat_weights)
+            labels.append(name)
+
+            print(f"{name}: Mean = {mean:.5f}, Variance = {var:.5f}")
+
+        plt.figure(figsize=(10, 6))
+        sns.set_style("whitegrid")
+
+        sns.boxplot(data=all_weights, palette="Set2")
+        plt.xticks(ticks=range(len(labels)), labels=labels, fontsize=12)
+        plt.ylabel("Weight Value", fontsize=12)
+        plt.title(
+            f"Distribution of Projection Layer Weights ({self.args.dataset})", fontsize=14)
+
+        for i, name in enumerate(labels):
+            plt.text(i, np.max(all_weights[i]), f"Var: {variances[name]:.4f}",
+                     ha='center', va='bottom', fontweight='bold', color='black')
+
+        save_path = f"weight_variance_analysis_{self.args.dataset}.png"
+        plt.tight_layout()
+        plt.savefig(save_path)
+        plt.close()
+
+        print(f"Variance plot saved to {save_path}")
+
+    def generate_case_study(self, tag='test', path=None, output_path='case_studies.csv'):
+
+        print(f"Generating Case Study CSV at: {output_path}...")
+
+        output_path = f"{self.args.dataset}_case_studies.csv"
+        if tag == 'test' and path:
+            print(f"Loading weights from {path}")
+            self.model.load_state_dict(torch.load(path))
+
+        self.model.eval()
+
+        with torch.no_grad():
+            q_z = self.model.child_projection(self.test_set.encode_query)
+
+            candidates_sphere_list = []
+
+            if self.args.is_multi_parent:
+                candidate_list = np.array(
+                    sorted(list(self.test_set.true_concept_set)))
+            else:
+                candidate_list = np.array(
+                    sorted(list(self.train_set.train_concept_set)))
+
+            for encode_candidate in tqdm(self.test_loader, desc="Encoding Candidates"):
+                candidate_z = self.model.par_projection(encode_candidate)
+                candidates_sphere_list.append(candidate_z)
+
+            candidates_sphere = torch.cat(candidates_sphere_list, dim=0)
+
+            candidate_depths = torch.tensor([
+                self.test_set.levels[cid]['depth'] for cid in candidate_list
+            ]).to(q_z.device)
+
+            candidate_descendants = torch.tensor([
+                self.test_set.levels[cid]['descendents'] for cid in candidate_list
+            ]).to(q_z.device)
+
+            score_min = self.test_set.levels[0]['raw_score_min']
+            score_range = self.test_set.levels[0]['raw_score_range']
+
+            num_queries = q_z.size(0)
+            num_candidates = candidates_sphere.size(0)
+
+            with open(output_path, mode='w', newline='', encoding='utf-8') as file:
+                writer = csv.writer(file)
+                header = ['Query ID', 'Query Name', 'Ground Truths',
+                          'Pred 1', 'Pred 2', 'Pred 3', 'Pred 4', 'Pred 5']
+                writer.writerow(header)
+
+                for i in tqdm(range(num_queries), desc="Processing Case Studies"):
+                    q_sph = q_z[i].unsqueeze(0).expand(num_candidates, -1)
+
+                    dot_product = torch.sum(candidates_sphere * q_sph, dim=1)
+                    norm_candidates = torch.norm(candidates_sphere, p=2, dim=1)
+                    norm_q = torch.norm(q_z[i], p=2)
+                    angular_score = dot_product / \
+                        ((norm_q * norm_candidates) + 1e-8)
+
+                    query_radius = candidate_depths + 1
+                    candidate_updated_radius = (candidate_depths + 1) + \
+                        ((torch.log1p(candidate_descendants)) /
+                         torch.log(torch.tensor(2.0)))
+
+                    q_rad_norm = 1 - ((query_radius - score_min) / score_range)
+                    c_rad_norm = 1 - \
+                        ((candidate_updated_radius - score_min) / score_range)
+
+                    radius_diff = torch.abs(c_rad_norm - q_rad_norm)
+
+                    radius_score = torch.where(
+                        angular_score > 1-(5*(radius_diff**2)), 1.0, 0.0)
+                    final_score = radius_score*angular_score
+
+                    top_vals, top_indices = torch.topk(final_score, k=5)
+                    top_indices = top_indices.cpu().numpy()
+
+                    query_id = self.test_set.test_concepts_id[i]
+                    query_name = self.test_set.id_concept[query_id]
+
+                    gt_ids = self.test_set.test_gt_id[i]
+                    if not isinstance(gt_ids, list) and not isinstance(gt_ids, np.ndarray):
+                        gt_ids = [gt_ids]
+
+                    gt_names = [self.test_set.id_concept.get(
+                        gid, str(gid)) for gid in gt_ids if gid in self.test_set.id_concept]
+                    gt_str = "; ".join(gt_names)
+
+                    pred_names = []
+                    for idx in top_indices:
+                        pred_id = candidate_list[idx]
+                        p_name = self.test_set.id_concept.get(
+                            pred_id, str(pred_id))
+                        pred_names.append(p_name)
+
+                    row = [query_id, query_name, gt_str] + pred_names
+                    writer.writerow(row)
+
+        print(f"Case studies saved successfully to {output_path}")

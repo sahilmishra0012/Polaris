@@ -4,7 +4,7 @@ import argparse
 from pre_process import *
 from utils import *
 from exp import Experiments
-from utils import print_local_time, set_seed
+from utils import print_aoe_time, set_seed
 import os
 
 # os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
@@ -95,7 +95,7 @@ parser.add_argument('--implement_rectangular_opt', type=bool, default=False,
 
 start_time = time.time()
 print("Start time at : ")
-print_local_time()
+print_aoe_time()
 
 args = parser.parse_args()
 args.cuda = True  # inference
@@ -104,6 +104,5 @@ torch.cuda.set_device(args.gpu_id)
 
 print(args)
 exp = Experiments(args)
-
-exp.generate_embeddings_and_plot(
-    '../result/science/train/independent_seed_runs/experiment_science_20_0.3_512_0.7_0.4_0.3_2.0_1.0_vmf_theta_0.1_30.checkpoint', n_clusters=23)
+exp.plot_ridgeline_case_study(
+    tag='test', path='')

@@ -488,8 +488,9 @@ def cartesian_to_spherical_angles(e: torch.Tensor) -> tuple[torch.Tensor, torch.
     theta = angles[:, -1]
     psi1 = angles[:, -2]
     psi2 = angles[:, -3]
+    psi_d= angles[:,0]
 
-    return theta, psi1, psi2
+    return theta, psi1, psi2,psi_d
 
 
 def get_long_angle(mu):
@@ -503,7 +504,8 @@ def visualize_angles(mu_q, mu_p, mu_t1, mu_t2, fname):
     angle_t1 = get_long_angle(mu_t1)
     angle_t2 = get_long_angle(mu_t2)
 
-    fig, ax = plt.subplots(figsize=(8, 8), subplot_kw={'projection': 'polar'})
+    fig, ax = plt.subplots(figsize=(8, 8), subplot_kw={
+                           'projection': 'polar'}, dpi=300)
 
     points_to_plot = [
         {'angle': angle_q, 'radius': 1, 'label': 'Query',

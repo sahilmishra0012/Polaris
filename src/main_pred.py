@@ -73,7 +73,7 @@ parser.add_argument('--model', type=str, default='bert', help='PLM Used')
 parser.add_argument('--accumulation_steps', type=int, default=1)
 
 parser.add_argument('--exp_name', type=str,
-                    default='my old story', help='Experiment name')
+                    default='experiment_name', help='Experiment name')
 parser.add_argument('--resume', type=str, default='no', help='Resume a run')
 parser.add_argument('--run_id', type=str, default='',
                     help='Wandb run id for resumption')

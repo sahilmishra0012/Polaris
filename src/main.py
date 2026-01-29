@@ -81,7 +81,7 @@ parser.add_argument('--method', type=str, default='normal',
                     help='Experiment method conducted')
 
 parser.add_argument('--exp_name', type=str,
-                    default='my old story', help='Experiment name')
+                    default='experiment_name', help='Experiment name')
 parser.add_argument('--resume', type=str, default='no', help='Resume a run')
 parser.add_argument('--run_id', type=str, default='',
                     help='Wandb run id for resumption')

@@ -6,7 +6,7 @@ from pre_process import *
 from utils import *
 from exp import Experiments
 import torch.multiprocessing as tmp
-from utils import print_local_time, set_seed
+
 import wandb
 
 os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
@@ -158,7 +158,7 @@ def experiment(args):
 
     print("Time used :{:.01f}s".format(time.time()-start_time))
     print("End time at : ")
-    print_local_time()
+
     print("************END***************")
 
 

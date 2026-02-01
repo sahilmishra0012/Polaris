@@ -57,6 +57,8 @@ parser.add_argument(
 parser.add_argument('--kappa_align', help='Kappa Alignment', type=float)
 parser.add_argument('--kappa_repel', help='Kappa repulsion', type=float)
 parser.add_argument('--svgd_kernel', help='SVGD kernel')
+parser.add_argument('--potential_strength',
+                    help='Strength of orbital potential', type=float, default=5.0)
 
 
 # Others
@@ -104,5 +106,6 @@ torch.cuda.set_device(args.gpu_id)
 
 print(args)
 exp = Experiments(args)
-exp.plot_ridgeline_case_study(
-    tag='test', path='')
+args.is_multi_parent = False
+exp.plot_kappa_vs_depth(
+    tag='test', path='../final_result/environment/independent_seed_runs/experiment_environment_20_0.3_512_0.7_0.4_0.3_2.0_1.0_vmf_theta_0.1_40.pt')

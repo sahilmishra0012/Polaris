@@ -1,86 +1,86 @@
 Query ID,Query Name,Ground Truths,Pred 1,Pred 2,Pred 3,Pred 4,Pred 5
-125,epigraphy,paleography,paleography,social anthropology,semantics,sociology,descriptive linguistics
-380,solid geometry,geometry,geometry,trigonometry,mechanics,chemistry,microscopic anatomy
-376,sociolinguistics,linguistics,mathematics,statistics,linguistics,social psychology,applied mathematics
-66,compound morphology,morphology,semantics,descriptive linguistics,cognitive psychology,geometry,microscopic anatomy
-388,statics,mechanics,geometry,mechanics,paleobiology,microscopic anatomy,chemistry
-79,cryptanalysis,science,chemistry,immunology,quantum physics,pharmacology,descriptive linguistics
-423,veterinary medicine,medicine,life science,dentistry,zoology,botany,biology
-88,dental anatomy,gross anatomy,systematics,physiology,psychiatry,genomics,natural science
-64,comparative anatomy,anatomy,gross anatomy,microscopic anatomy,cognitive psychology,zoology,biology
-193,jungian psychology,psychotherapy,cognitive psychology,sociology,semantics,chemistry,microscopic anatomy
-251,nonparametric statistics,statistics,calculus,geometry,fluid mechanics,algebra,mechanics
-8,agrology,science,economic geology,botany,systematics,life science,earth science
-416,triangulation,trigonometry,geometry,trigonometry,geophysics,mechanics,cognitive psychology
-383,speleology,geology,geology,pure mathematics,anthropology,medicine,forestry
-307,physical chemistry,chemistry,dynamics,physics,chemistry,quantum physics,organic chemistry
-176,home economics,social science,economics,geography,biology,sociology,earth science
-63,cognitive semantics,semantics,cognitive psychology,experimental psychology,social psychology,information science,semantics
-256,nutrition,science,medicine,psychology,social psychology,anthropology,biotechnology
-346,pteridology,botany,paleontology,optics,biochemistry,natural science,life science
-55,cladistics,taxonomy,systematics,biochemistry,paleontology,social anthropology,quantum field theory
-116,elementary geometry,geometry,algebra,non euclidean geometry,calculus,pure mathematics,geometry
-97,developmental psychology,psychology,experimental psychology,life science,biochemistry,social anthropology,natural science
-47,brain science,neuroscience,natural science,information science,biochemistry,experimental psychology,life science
-56,classical mechanics,mechanics,dynamics,fluid mechanics,biochemistry,optics,physics
-295,petroleum geology,economic geology,economic geology,paleontology,electronics,natural science,geology
-335,protozoology,zoology,microscopic anatomy,zoology,organic chemistry,molecular biology,life science
-395,sumerology,archaeology,social anthropology,social science,earth science,politics,life science
-17,anesthesiology,medicine,obstetrics,dentistry,anatomy,fluid mechanics,medical science
-194,kinematics,mechanics,dynamics,biochemistry,fluid mechanics,optics,quantum field theory
-135,femtochemistry,chemistry,organic chemistry,dentistry,microscopic anatomy,mechanics,biology
-93,dermatology,medicine,dentistry,cognitive psychology,immunology,meteorology,fluid mechanics
-223,microeconomics,economics,biochemistry,biotechnology,social psychology,information science,economics
-144,fractal geometry,geometry,geometry,trigonometry,mathematics,algebra,chemistry
-39,biomedical science,life science,biotechnology,pharmacology,neurobiology,physiology,life science
-294,periodontics,dentistry,dentistry,obstetrics,medical science,anatomy,fluid mechanics
-343,psychopharmacology,pharmacology,psychotherapy,psychiatry,natural science,psychology,medical science
-149,garbology,social anthropology,statistics,social science,archaeology,geophysics,meteorology
-68,conchology,malacology,life science,linguistics,paleontology,applied mathematics,acoustics
-359,reflexology,behaviorism,experimental psychology,cognitive psychology,dentistry,psychotherapy,social anthropology
-200,limnology,earth science,sociology,meteorology,geophysics,botany,dentistry
-243,neuroanatomy,anatomy,anatomy,physiology,systematics,obstetrics,genomics
-94,descriptive grammar,grammar,syntax,descriptive linguistics,grammar,semantics,information science
-11,algorism,arithmetic,politics,mathematics,chemistry,quantum field theory,semantics
-297,pharmacogenetics,genetics,medicine,psychology,physiology,social psychology,systematics
-355,radiobiology,biology,immunology,acoustics,life science,physics,quantum physics
-236,natural history,science,life science,physical anthropology,paleontology,natural science,social anthropology
-310,physiological psychology,psychology,cognitive psychology,experimental psychology,biochemistry,social anthropology,molecular biology
-211,marine archaeology,archaeology,anthropology,geology,medicine,paleontology,systematics
-391,strategics,science,life science,information science,earth science,mathematics,politics
-242,nephrology,medicine,dentistry,meteorology,microscopic anatomy,cognitive psychology,fluid mechanics
-392,stratigraphy,geology,paleontology,economic geology,fluid mechanics,paleobiology,social anthropology
-27,astrometry,astronomy,astronomy,optics,acoustics,fluid mechanics,life science
-152,genetic engineering,biotechnology,pharmacology,life science,archaeology,biology,botany
-289,particle physics,physics,astrophysics,mechanics,geophysics,geometry,quantum field theory
-408,thermochemistry,chemistry,biochemistry,optics,fluid mechanics,electronics,physics
-219,metamathematics,pure mathematics,information science,quantum field theory,systematics,mathematics,applied mathematics
-268,orthopedics,medical science,medical science,obstetrics,anatomy,fluid mechanics,dentistry
-222,microbiology,biology,molecular biology,cytology,life science,biochemistry,natural science
-100,differential calculus,calculus,calculus,algebra,fluid mechanics,applied mathematics,geometry
-300,pharmacy,medicine,sociology,botany,dentistry,pharmacology,biology
-354,radio astronomy,astronomy,optics,astronomy,biochemistry,natural science,electronics
-126,ethnography,anthropology,experimental psychology,social anthropology,immunology,social psychology,information science
-101,differential psychology,psychology,experimental psychology,social anthropology,social psychology,life science,biochemistry
-254,nuclear physics,physics,dynamics,mechanics,quantum physics,physics,fluid mechanics
-325,primatology,mammalogy,biochemistry,paleontology,natural science,genomics,psychiatry
-287,paletiology,archaeology,paleozoology,social anthropology,medical science,life science,geophysics
-320,posology,pharmacology,otology,obstetrics,anatomy,medical science,biochemistry
-123,enzymology,biochemistry,molecular biology,systematics,biochemistry,anatomy,genomics
-9,agronomy,science,life science,economic geology,botany,biochemistry,biology
-23,architectonics,science,politics,sociology,biology,botany,earth science
-15,analytic geometry,geometry,algebra,calculus,non euclidean geometry,geometry,applied mathematics
-298,pharmacokinetics,pharmacology,biochemistry,dentistry,medical science,neurobiology,optics
-0,abnormal psychology,psychology,cognitive psychology,social science,experimental psychology,sociology,microscopic anatomy
-58,clinical anatomy,anatomy,microscopic anatomy,cognitive psychology,meteorology,physiology,social science
-246,neurology,medicine,otology,neurobiology,medical science,psychiatry,anatomy
-197,lexical semantics,semantics,descriptive linguistics,semantics,cognitive psychology,information science,geometry
-361,rheology,physics,fluid mechanics,immunology,paleobiology,mechanics,quantum field theory
-26,astrodynamics,astronomy,fluid mechanics,acoustics,physics,geophysics,mechanics
-33,ballistics,dynamics,statistics,electronics,natural science,systematics,geology
-150,gastroenterology,medicine,dentistry,meteorology,fluid mechanics,microscopic anatomy,immunology
-276,paleoecology,ecology,paleobiology,archaeology,meteorology,earth science,geophysics
-266,orthodontics,dentistry,obstetrics,dentistry,medical science,genomics,psychiatry
-271,paleoanthropology,vertebrate paleontology,paleobiology,social science,earth science,meteorology,archaeology
-111,electrochemistry,chemistry,chemistry,organic chemistry,mechanics,botany,quantum physics
-13,allergology,medicine,cognitive psychology,immunology,mechanics,paleobiology,microscopic anatomy
+125,epigraphy,paleography,paleography,archaeology,anthropology,linguistics,morphology
+380,solid geometry,geometry,geometry,pure mathematics,calculus,mathematics,applied mathematics
+376,sociolinguistics,linguistics,linguistics,descriptive linguistics,semantics,grammar,social science
+66,compound morphology,morphology,grammar,morphology,descriptive linguistics,linguistics,geophysics
+388,statics,mechanics,mechanics,fluid mechanics,physics,natural science,psychology
+79,cryptanalysis,science,statistics,applied mathematics,correlation,mathematics,science
+423,veterinary medicine,medicine,medicine,zoology,audiology,angiology,aeromedicine
+88,dental anatomy,gross anatomy,dentistry,anatomy,morphology,geophysics,grammar
+64,comparative anatomy,anatomy,anatomy,microscopic anatomy,morphology,grammar,geophysics
+193,jungian psychology,psychotherapy,psychology,experimental psychology,cognitive psychology,science,physics
+251,nonparametric statistics,statistics,statistics,correlation,applied mathematics,mathematics,science
+8,agrology,science,botany,geology,geophysics,social science,earth science
+416,triangulation,trigonometry,geology,earth science,pure mathematics,geophysics,mathematics
+383,speleology,geology,geology,geophysics,earth science,morphology,paleontology
+307,physical chemistry,chemistry,chemistry,physics,natural science,biology,acoustics
+176,home economics,social science,economics,social science,anthropology,archaeology,applied mathematics
+63,cognitive semantics,semantics,semantics,linguistics,descriptive linguistics,grammar,psychology
+256,nutrition,science,life science,natural science,medicine,archaeology,morphology
+346,pteridology,botany,botany,pure mathematics,mathematics,morphology,grammar
+55,cladistics,taxonomy,systematics,biology,archaeology,anthropology,life science
+116,elementary geometry,geometry,pure mathematics,geometry,trigonometry,mathematics,calculus
+97,developmental psychology,psychology,psychology,biology,science,descriptive linguistics,grammar
+47,brain science,neuroscience,neuroscience,neurobiology,science,applied mathematics,psychology
+56,classical mechanics,mechanics,mechanics,physics,quantum physics,geometry,natural science
+295,petroleum geology,economic geology,economic geology,geology,earth science,geophysics,morphology
+335,protozoology,zoology,biology,life science,zoology,morphology,chemistry
+395,sumerology,archaeology,archaeology,anthropology,linguistics,morphology,descriptive linguistics
+17,anesthesiology,medicine,medicine,medical science,geology,aeromechanics,acoustics
+194,kinematics,mechanics,dynamics,mechanics,fluid mechanics,physics,geometry
+135,femtochemistry,chemistry,chemistry,organic chemistry,physics,natural science,zoology
+93,dermatology,medicine,medicine,anthropology,morphology,geophysics,life science
+223,microeconomics,economics,economics,social science,anthropology,archaeology,applied mathematics
+144,fractal geometry,geometry,geometry,pure mathematics,calculus,mathematics,applied mathematics
+39,biomedical science,life science,medicine,medical science,life science,natural science,science
+294,periodontics,dentistry,dentistry,science,medical science,life science,geology
+343,psychopharmacology,pharmacology,psychotherapy,psychiatry,psychology,medical science,descriptive linguistics
+149,garbology,social anthropology,economics,social science,anthropology,archaeology,applied mathematics
+68,conchology,malacology,zoology,paleobiology,paleontology,earth science,geology
+359,reflexology,behaviorism,medicine,science,natural science,psychology,acoustics
+200,limnology,earth science,earth science,geology,paleontology,geophysics,linguistics
+243,neuroanatomy,anatomy,neuroscience,neurobiology,physiology,anatomy,science
+94,descriptive grammar,grammar,grammar,descriptive linguistics,linguistics,morphology,geophysics
+11,algorism,arithmetic,applied mathematics,mathematics,science,statistics,pure mathematics
+297,pharmacogenetics,genetics,pharmacology,chemistry,mathematics,pure mathematics,medicine
+355,radiobiology,biology,genetics,biology,physics,chemistry,medical science
+236,natural history,science,life science,paleontology,biology,earth science,natural science
+310,physiological psychology,psychology,social psychology,psychology,science,physics,linguistics
+211,marine archaeology,archaeology,archaeology,anthropology,paleontology,earth science,medical science
+391,strategics,science,social science,science,anthropology,psychology,natural science
+242,nephrology,medicine,medicine,medical science,anatomy,analysis,aeromedicine
+392,stratigraphy,geology,geology,geophysics,earth science,morphology,paleontology
+27,astrometry,astronomy,astronomy,astrophysics,natural science,pure mathematics,medical science
+152,genetic engineering,biotechnology,genetics,biology,life science,natural science,science
+289,particle physics,physics,physics,quantum physics,mechanics,science,chemistry
+408,thermochemistry,chemistry,chemistry,organic chemistry,physics,natural science,social science
+219,metamathematics,pure mathematics,mathematics,pure mathematics,applied mathematics,algebra,calculus
+268,orthopedics,medical science,medicine,anatomy,medical science,morphology,geophysics
+222,microbiology,biology,biology,life science,earth science,physics,morphology
+100,differential calculus,calculus,calculus,analysis,pure mathematics,geometry,mathematics
+300,pharmacy,medicine,pharmacology,medicine,chemistry,mathematics,descriptive linguistics
+354,radio astronomy,astronomy,astronomy,natural science,chemistry,medical science,zoology
+126,ethnography,anthropology,social science,anthropology,sociology,economics,archaeology
+101,differential psychology,psychology,psychology,experimental psychology,social psychology,cognitive psychology,science
+254,nuclear physics,physics,physics,chemistry,natural science,geophysics,morphology
+325,primatology,mammalogy,zoology,biology,life science,anthropology,social science
+287,paletiology,archaeology,paleobiology,paleontology,archaeology,earth science,zoology
+320,posology,pharmacology,medicine,alienism,aeromedicine,analysis,agrobiology
+123,enzymology,biochemistry,organic chemistry,chemistry,pure mathematics,biology,mathematics
+9,agronomy,science,botany,science,morphology,geophysics,mathematics
+23,architectonics,science,geophysics,morphology,anatomy,geology,grammar
+15,analytic geometry,geometry,geometry,pure mathematics,algebra,mathematics,calculus
+298,pharmacokinetics,pharmacology,pharmacology,chemistry,pure mathematics,mathematics,anthropology
+0,abnormal psychology,psychology,psychotherapy,psychiatry,psychology,medical science,geology
+58,clinical anatomy,anatomy,medical science,anatomy,geophysics,morphology,grammar
+246,neurology,medicine,neuroscience,neurobiology,medicine,science,medical science
+197,lexical semantics,semantics,semantics,linguistics,descriptive linguistics,grammar,morphology
+361,rheology,physics,mechanics,fluid mechanics,physics,natural science,medical science
+26,astrodynamics,astronomy,astronomy,natural science,mechanics,physics,geometry
+33,ballistics,dynamics,mechanics,physics,science,linguistics,zoology
+150,gastroenterology,medicine,medicine,bacteriology,aeromedicine,biomedicine,angiology
+276,paleoecology,ecology,paleobiology,paleontology,archaeology,earth science,anthropology
+266,orthodontics,dentistry,dentistry,dental surgery,science,medical science,life science
+271,paleoanthropology,vertebrate paleontology,archaeology,paleobiology,anthropology,paleontology,earth science
+111,electrochemistry,chemistry,chemistry,physics,mathematics,zoology,social science
+13,allergology,medicine,medicine,geophysics,bacteriology,angiology,aeromedicine

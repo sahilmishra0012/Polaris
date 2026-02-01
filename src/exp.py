@@ -18,6 +18,7 @@ from sklearn.decomposition import PCA
 import gc
 import pandas as pd
 import seaborn as sns
+from scipy.stats import pearsonr, spearmanr
 from hooks import GradientLogger
 import csv
 import wandb
@@ -602,7 +603,7 @@ class Experiments(object):
                     candidate_radius_normalized-query_radius_normalized)
 
                 radius_score = torch.where(
-                    angular_score > 1-(5*(radius_diff**2)), 1.0, 0.0)
+                    angular_score > 1-(self.args.potential_strength*(radius_diff**2)), 1.0, 0.0)
                 final_score = radius_score*angular_score
 
                 score_list.append(final_score)
@@ -944,7 +945,7 @@ class Experiments(object):
                     radius_diff = torch.abs(c_rad_norm - q_rad_norm)
 
                     radius_score = torch.where(
-                        angular_score > 1-(5*(radius_diff**2)), 1.0, 0.0)
+                        angular_score > 1-(self.args.potential_strength*(radius_diff**2)), 1.0, 0.0)
                     final_score = radius_score*angular_score
 
                     top_vals, top_indices = torch.topk(final_score, k=5)
@@ -972,3 +973,83 @@ class Experiments(object):
                     writer.writerow(row)
 
         print(f"Case studies saved successfully to {output_path}")
+
+    def plot_kappa_vs_depth(self, tag=None, path=None):
+        print("Starting Kappa vs. Depth Analysis (Aggregated)...")
+
+        if path:
+            self.model.load_state_dict(torch.load(path))
+        self.model.eval()
+
+        candidates_k_list = list()
+
+        if self.args.is_multi_parent == True:
+            candidate_list = np.array(
+                sorted(list(self.test_set.true_concept_set)))
+        else:
+            candidate_list = np.array(
+                sorted(list(self.train_set.train_concept_set)))
+
+        with torch.no_grad():
+            for encode_candidate in tqdm(self.test_loader, desc="Extracting Kappas"):
+                candidate_z = self.model.par_projection(encode_candidate)
+                candidate_k = self.model.vmf_regulariser.kappa_predictor(
+                    candidate_z)
+                candidates_k_list.append(candidate_k)
+
+        candidates_k = torch.cat(
+            candidates_k_list, dim=0).squeeze().cpu().numpy()
+
+        min_len = min(len(candidates_k), len(candidate_list))
+        candidates_k = candidates_k[:min_len]
+        candidate_list = candidate_list[:min_len]
+
+        candidate_depths = []
+        for cid in candidate_list:
+            candidate_depths.append(self.test_set.levels[cid]['depth'])
+        candidate_depths = np.array(candidate_depths)
+
+        df = pd.DataFrame({
+            'Depth': candidate_depths,
+            'Kappa': candidates_k
+        })
+
+        median_stats = df.groupby('Depth')['Kappa'].median().reset_index()
+
+        raw_corr, raw_p = pearsonr(df['Depth'], df['Kappa'])
+
+        median_corr, median_p = pearsonr(
+            median_stats['Depth'], median_stats['Kappa'])
+
+        print(f"\n=== Statistical Results ===")
+        print(
+            f"1. Global Raw Correlation (N={len(df)}): {raw_corr:.4f} (p={raw_p:.2e})")
+        print(
+            f"2. Aggregated Median Trend Correlation (N={len(median_stats)} levels): {median_corr:.4f} (p={median_p:.4f})")
+
+        save_dir = f'./depth'
+        os.makedirs(save_dir, exist_ok=True)
+
+        plt.figure(figsize=(8, 5))
+
+        ax = sns.boxplot(x='Depth', y='Kappa', data=df,
+                         color="#89CFF0",
+                         showfliers=False,
+                         width=0.6,
+                         linewidth=1.2)
+
+        sns.pointplot(x='Depth', y='Kappa', data=median_stats,
+                      color='darkblue', markers='o', scale=0.6, linestyles='-', ax=ax)
+
+        plt.title(
+            f'Semantic Certainty vs. Depth: {self.args.dataset}\n(Median Trend Correlation: {median_corr:.2f})')
+        plt.xlabel('Hierarchical Depth')
+        plt.ylabel('Concentration Parameter ($\kappa$)')
+        plt.grid(axis='y', linestyle='--', alpha=0.5)
+
+        filename = f"kappa_vs_depth_{self.args.dataset}.pdf"
+        save_path = os.path.join(save_dir, filename)
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        plt.close()
+
+        print(f"Clean plot saved to: {save_path}")

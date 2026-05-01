@@ -15,6 +15,7 @@ import collections
 
 
 def create_child_to_parents_map(taxo_file_path: str, dataset: str) -> Dict[str, List[str]]:
+    """Build a mapping from each child node to all observed parent nodes."""
     with open(f"../data/{dataset}/key_value.json", 'r') as f:
         id_term_map = json.load(f)
 
@@ -42,6 +43,7 @@ def create_child_to_parents_map(taxo_file_path: str, dataset: str) -> Dict[str, 
 
 
 def terms_to_json(file, dataset):
+    """Convert a tab-separated terms file into a JSON concept mapping."""
     def_dict = {}
 
     with open(file, 'r') as file:
@@ -54,6 +56,7 @@ def terms_to_json(file, dataset):
 
 
 def csv_to_json(csv_file):
+    """Convert a CSV concept mapping into JSON format."""
     def_dict = {}
     with open(csv_file, mode='r') as file:
         csv_reader = csv.reader(file)
@@ -68,6 +71,7 @@ def csv_to_json(csv_file):
 
 
 def analyze_parent_child_relationships(filepath: str):
+    """Summarize parent-child multiplicity statistics in a taxonomy file."""
     child_to_parents_map = collections.defaultdict(list)
 
     print(f"--- Analyzing file: {filepath} ---")
@@ -127,6 +131,7 @@ def analyze_parent_child_relationships(filepath: str):
 
 
 def id_to_json(filepath: str, dataset: str):
+    """Create a JSON mapping from taxonomy identifiers to concept names."""
     try:
         with open(filepath, 'r') as f:
             contents = f.readlines()
@@ -139,11 +144,13 @@ def id_to_json(filepath: str, dataset: str):
 
 
 def pre_process_mag(args, outID=True):
+    """Preprocess a MAG-style taxonomy into serialized train/test artifacts."""
     print("Processing MAG datasets...")
     dataset = args.dataset
     negsamples = args.negsamples
 
     def load_file(filepath: str) -> list[str]:
+        """Read a tab-separated taxonomy file into parent-child pairs."""
         try:
             with open(filepath, 'r') as f:
                 return f.readlines()
@@ -157,6 +164,7 @@ def pre_process_mag(args, outID=True):
         id_term_map = json.load(f)
 
     def process_pair(pair):
+        """Process one taxonomy edge and update split-specific bookkeeping structures."""
         ids = pair.strip().split("\t")
         return (id_term_map[ids[0]], id_term_map[ids[1]])
 
@@ -251,6 +259,7 @@ def pre_process_mag(args, outID=True):
     memo = {}
 
     def get_all_descendants(start_node):
+        """Collect descendant identifiers for each node in the taxonomy graph."""
         if start_node in memo:
             return memo[start_node]
         descendants = set()
@@ -323,6 +332,7 @@ def pre_process_mag(args, outID=True):
     print("Processing validation and test sets...")
 
     def get_eval_data(lines):
+        """Construct query nodes and ground-truth parents for evaluation."""
         concept_ids, gts_ids = [], []
         for line in lines:
             _, child_term = line.strip().split("\t")
@@ -425,14 +435,14 @@ def pre_process_mag(args, outID=True):
         child_neg_parent_pair, val_concepts_ids, val_gts_ids, test_concepts_ids, test_gts_ids, normalized_radii
     )
 
-# Parents are labels and children are image paths. Dataset structured as a forest.
-
 
 def pre_process_images(args, outID=True):
+    """Preprocess image taxonomy data into serialized train/test artifacts."""
     print("Processing Birds dataset...")
     dataset = args.dataset
 
     def load_file(filepath):
+        """Read a tab-separated taxonomy file into parent-child pairs."""
         try:
             with open(filepath, 'r') as f:
                 return f.readlines()
@@ -440,12 +450,11 @@ def pre_process_images(args, outID=True):
             raise FileNotFoundError(f"File not found: {filepath}")
 
     def process_pair(pair):
+        """Process one taxonomy edge and update split-specific bookkeeping structures."""
         ids = pair.strip().split()
         return (ids[1], ids[0])
 
-    # 0 represents the image path and 1 represents the label
-    # Parent is the label and child is the image. This structure aligns image with label.
-    taxonomy_file = os.path.join(f"../data/{dataset}/{dataset}.taxo")
+    taxonomy_file = os.path.join(f"../data/{dataset}/{dataset}_full.taxo")
     full_taxonomy_pairs = load_file(taxonomy_file)
 
     all_concept_set_str = set([])
@@ -489,7 +498,7 @@ def pre_process_images(args, outID=True):
 
     print(f"Loaded {len(concept_set)} total image paths and labels")
     train_taxonomy_file = os.path.join(
-        f"../data/{dataset}/{dataset}_train.taxo")
+        f"../data/{dataset}/{dataset}_train_full.taxo")
     train_taxonomy_pairs = load_file(train_taxonomy_file)
 
     parent_list, child_list = [], []
@@ -548,6 +557,7 @@ def pre_process_images(args, outID=True):
     memo = {}
 
     def get_all_descendants(start_node):
+        """Collect descendant identifiers for each node in the taxonomy graph."""
         if start_node in memo:
             return memo[start_node]
         descendants = set()
@@ -591,10 +601,11 @@ def pre_process_images(args, outID=True):
     id_context = id_concept
     print("Processing test split....")
 
-    test_file = os.path.join(f"../data/{dataset}/{dataset}_test.taxo")
+    test_file = os.path.join(f"../data/{dataset}/{dataset}_test_full.taxo")
     test_term_lines = load_file(test_file)
 
     def get_eval_data(lines):
+        """Construct query nodes and ground-truth parents for evaluation."""
         concept_ids, gts_ids = [], []
         for line in lines:
             _, child_term = process_pair(line)
@@ -657,7 +668,6 @@ def pre_process_images(args, outID=True):
                     if x != child_id and x != parent_id and x not in parent_set and x not in found_set]
 
             if pool:
-                # sample up to `needed` items (without replacement)
                 to_take = min(needed, len(pool))
                 chosen = random.sample(pool, to_take)
                 found_negatives.extend(chosen)
@@ -692,6 +702,415 @@ def pre_process_images(args, outID=True):
         sampled_negative_parent_dict, child_parent_negative_parent_triple, parent_list, child_list,
         negative_parent_list, all_taxo_dict, path2root, child_parent_pair,
         child_neg_parent_pair, val_concepts_ids, val_gts_ids, test_concepts_ids, test_gts_ids, normalized_radii, all_labels_set
+    )
+
+
+def preprocess_robustness(args, completeness_percentage=100, outID=True):
+
+    """Preprocess robustness splits for single-parent taxonomy experiments."""
+    dataset = args.dataset
+    print(
+        f"--- Preprocessing for Robustness Test @ {completeness_percentage}% (Simplified: No Pruning) ---")
+
+    def load_file(filepath: str) -> list[str]:
+        """Read a tab-separated taxonomy file into parent-child pairs."""
+        try:
+            with open(filepath, 'r') as f:
+                return f.readlines()
+        except FileNotFoundError:
+            raise FileNotFoundError(f"File not found: {filepath}")
+
+    def process_pair(pair: str, dataset: str) -> tuple[str, str]:
+        """Process one taxonomy edge and update split-specific bookkeeping structures."""
+        text = pair.strip().split("\t")
+        if (dataset == "wordnet" or "wordnet" in dataset[:8]):
+            return (text[-1], text[-2])
+        return (text[-2], text[-1]) if len(text) >= 3 else (text[0], text[1])
+
+    taxonomy_file = os.path.join(f"../data/{dataset}/{dataset}_raw_en.taxo")
+    full_taxonomy_pairs_str = [process_pair(
+        p, dataset) for p in load_file(taxonomy_file)]
+
+    concept_set_str = {
+        concept for pair in full_taxonomy_pairs_str for concept in pair}
+    concepts = sorted(list(concept_set_str))
+    concept_id = {concept: idx for idx, concept in enumerate(concepts)}
+    id_concept = {idx: concept for concept, idx in concept_id.items()}
+
+    train_taxonomy_file = os.path.join(
+        f"../data/{dataset}/{dataset}_train.taxo")
+    train_taxonomy_pairs_str = [process_pair(
+        p, dataset) for p in load_file(train_taxonomy_file)]
+
+    if completeness_percentage < 100:
+        num_to_keep = int(len(train_taxonomy_pairs_str) *
+                          (completeness_percentage / 100.0))
+        degraded_train_pairs_str = random.sample(
+            train_taxonomy_pairs_str, num_to_keep)
+        print(
+            f"Degrading training taxonomy: Kept {len(degraded_train_pairs_str)} of {len(train_taxonomy_pairs_str)} edges.")
+    else:
+        degraded_train_pairs_str = train_taxonomy_pairs_str
+
+    train_concept_set = set()
+    chd2par_dict = collections.defaultdict(set)
+    taxo_dict = collections.defaultdict(list)
+    taxo_edges, parent_list, child_list = [], [], []
+
+    concept_set = set(concept_id.values()) if outID else set(concepts)
+
+    for parent, child in degraded_train_pairs_str:
+        p_id, c_id = concept_id[parent], concept_id[child]
+        parent_list.append(p_id)
+        child_list.append(c_id)
+        train_concept_set.update([p_id, c_id])
+        chd2par_dict[c_id].add(p_id)
+        taxo_dict[p_id].append(c_id)
+        taxo_edges.append((p_id, c_id))
+
+    all_taxo_dict = taxo_dict
+
+    print("Recalculating radii based on the degraded graph (forest)...")
+    all_children_nodes = set(child_list)
+    roots = train_concept_set - all_children_nodes
+
+    depths = {}
+    queue = deque([(root, 1) for root in roots])
+    visited_for_depth = set(roots)
+    for root in roots:
+        depths[root] = 1
+
+    while queue:
+        node, depth = queue.popleft()
+        for child in taxo_dict.get(node, []):
+            if child not in visited_for_depth:
+                visited_for_depth.add(child)
+                depths[child] = depth + 1
+                queue.append((child, depth + 1))
+
+    memo = {}
+
+    def get_all_descendants(node):
+        """Collect descendant identifiers for each node in the taxonomy graph."""
+        if node in memo:
+            return memo[node]
+        descendants, q, visited = set(), deque(
+            taxo_dict.get(node, [])), set(taxo_dict.get(node, []))
+        while q:
+            curr = q.popleft()
+            descendants.add(curr)
+            for c in taxo_dict.get(curr, []):
+                if c not in visited:
+                    visited.add(c)
+                    q.append(c)
+        memo[node] = descendants
+        return descendants
+
+    raw_scores = {node: depths.get(
+        node, 1) + np.log2(len(get_all_descendants(node)) + 1) for node in train_concept_set}
+    all_raw_values = list(raw_scores.values()) if raw_scores else [0]
+    raw_score_min, raw_score_max = min(all_raw_values), max(all_raw_values)
+    raw_score_range = raw_score_max - \
+        raw_score_min if raw_score_max > raw_score_min else 1.0
+
+    normalized_radii = {
+        node: {'radii': 1.0 - ((score - raw_score_min) / raw_score_range),
+               'depth': depths.get(node, 1),
+               'descendents': len(get_all_descendants(node)),
+               'raw_score_min': raw_score_min,
+               'raw_score_range': raw_score_range}
+        for node, score in raw_scores.items()
+    }
+
+    if "wordnet" in dataset:
+        supernode = len(concepts)
+        concept_id[dataset], id_concept[supernode] = supernode, dataset
+        for root in roots:
+            taxo_dict[supernode].append(root)
+            chd2par_dict[root].add(supernode)
+
+    sibling_dict = {child: set(children) - {child}
+                    for parent, children in taxo_dict.items() for child in children}
+    cousin_dict = collections.defaultdict(set)
+    observe_nodes = train_concept_set - \
+        (roots if "wordnet" not in dataset else {supernode})
+
+    for node in observe_nodes:
+        for par in chd2par_dict.get(node, []):
+            uncles = sibling_dict.get(par, set()) - \
+                chd2par_dict.get(node, set())
+            cousin_dict[node].update(uncles)
+            for uncle in uncles:
+                cousin_dict[node].update(taxo_dict.get(uncle, []))
+        cousin_dict[node] -= sibling_dict.get(node, set())
+
+    negative_parent_dict = {cid: sibling_dict.get(
+        cid, set()) | cousin_dict.get(cid, set()) for cid in id_concept}
+
+    sampled_negative_parent_dict, negative_parent_list = {}, []
+    for cid in child_list:
+        negs = list(negative_parent_dict.get(cid, []))
+        if len(negs) > args.negsamples:
+            negs = list(np.random.choice(negs, args.negsamples, replace=False))
+        sampled_negative_parent_dict[cid] = negs
+        negative_parent_list.extend(negs)
+
+    child_parent_negative_parent_triple = [[child_list[i], parent_list[i], neg] for i, cid in enumerate(
+        child_list) for neg in sampled_negative_parent_dict.get(cid, [])]
+    child_parent_pair = list(zip(child_list, parent_list))
+    child_neg_parent_pair = [
+        [cid, neg] for cid in child_list for neg in sampled_negative_parent_dict.get(cid, [])]
+    sib_pair = [[k, s] for k, sibs in sibling_dict.items() for s in sibs]
+    child_sibling_pair = sib_pair
+    relative_triple = [[n, s, c] for n in observe_nodes for s in sibling_dict.get(
+        n, []) for c in cousin_dict.get(n, [])]
+
+    dic_file = os.path.join(f"../data/{dataset}/dic.json")
+    def_dic = json.load(open(dic_file))
+    def_dic = {k.lower(): v for k, v in def_dic.items()}
+    if "wordnet" in dataset and dataset not in def_dic:
+        def_dic[dataset] = ["Supernode"]
+    id_context = {
+        cid: f"{concept.lower()}: {def_dic.get(concept.lower(), [''])[0]}" for cid, concept in id_concept.items()}
+
+    test_terms_file = os.path.join(f"../data/{dataset}/{dataset}_eval.terms")
+    test_gt_file = os.path.join(f"../data/{dataset}/{dataset}_eval.gt")
+    test_terms_str = [line.strip() for line in load_file(test_terms_file)]
+    test_gt_str = [line.strip() for line in load_file(test_gt_file)]
+
+    test_concepts_id = [concept_id[term] for term in test_terms_str]
+    test_gt_id = [concept_id[term] for term in test_gt_str]
+
+    shuffled_data = list(zip(test_concepts_id, test_gt_id))
+    np.random.shuffle(shuffled_data)
+    split_idx = len(shuffled_data) // 2
+    val_concept, val_gt = zip(
+        *shuffled_data[:split_idx]) if shuffled_data else ([], [])
+    test_concept, test_gt = zip(
+        *shuffled_data[split_idx:]) if shuffled_data else ([], [])
+
+    path2root = collections.defaultdict(list)
+    if "wordnet" in dataset:
+        for node in train_concept_set:
+            current, path = node, []
+            while current != supernode:
+                path.append(current)
+                parents = list(chd2par_dict.get(current, []))
+                if not parents:
+                    break
+                current = parents[0]
+            path.append(supernode)
+            path2root[node] = path
+
+    print(
+        f"Preprocessing complete. Training concepts (may be disconnected): {len(train_concept_set)}")
+
+    return (
+        concept_set, concept_id, id_concept, id_context, train_concept_set, taxo_dict,
+        negative_parent_dict, child_parent_negative_parent_triple, parent_list, child_list,
+        negative_parent_list, sibling_dict, cousin_dict, relative_triple, test_concepts_id,
+        test_gt_id, all_taxo_dict, path2root, sib_pair, child_parent_pair, child_neg_parent_pair,
+        child_sibling_pair, val_concept, val_gt, test_concept, test_gt, normalized_radii
+    )
+
+
+def pre_process_mag_robustness(args, completeness_percentage=100, outID=True):
+
+    """Preprocess robustness splits for MAG-style multi-parent taxonomies."""
+    print(
+        f"--- Preprocessing MAG dataset '{args.dataset}' for Robustness @ {completeness_percentage}% ---")
+    dataset = args.dataset
+    negsamples = args.negsamples
+
+    def load_file(filepath: str) -> list[str]:
+        """Read a tab-separated taxonomy file into parent-child pairs."""
+        try:
+            with open(filepath, 'r') as f:
+                return f.readlines()
+        except FileNotFoundError:
+            raise FileNotFoundError(f"File not found: {filepath}")
+
+    with open(f"../data/{dataset}/key_value.json", 'r') as f:
+        id_term_map = json.load(f)
+
+    def process_pair(pair):
+        """Process one taxonomy edge and update split-specific bookkeeping structures."""
+        ids = pair.strip().split("\t")
+        return (id_term_map.get(ids[0], ids[0]), id_term_map.get(ids[1], ids[1]))
+
+    taxonomy_file = os.path.join(f"../data/{dataset}/{dataset}.taxo")
+    full_taxonomy_pairs = load_file(taxonomy_file)
+
+    all_concept_set_str = {
+        concept for pair in full_taxonomy_pairs for concept in process_pair(pair)}
+    concepts = sorted(list(all_concept_set_str))
+    concept_id = {concept: idx for idx, concept in enumerate(concepts)}
+    id_concept = {idx: concept for idx, concept in enumerate(concepts)}
+
+    all_taxo_dict = collections.defaultdict(list)
+    all_taxo_dict_reverse = collections.defaultdict(list)
+    concept_set = set(concept_id.values())
+
+    for pair in full_taxonomy_pairs:
+        parent_str, child_str = process_pair(pair)
+        parent_id, child_id = concept_id[parent_str], concept_id[child_str]
+        all_taxo_dict[parent_id].append(child_id)
+        all_taxo_dict_reverse[child_id].append(parent_id)
+
+    print(f"Loaded {len(concept_set)} total concepts.")
+
+    train_taxonomy_file = os.path.join(
+        f"../data/{dataset}/{dataset}_train.taxo")
+    train_taxonomy_pairs_raw = load_file(train_taxonomy_file)
+
+    if completeness_percentage < 100:
+        num_to_keep = int(len(train_taxonomy_pairs_raw) *
+                          (completeness_percentage / 100.0))
+        degraded_train_pairs_raw = random.sample(
+            train_taxonomy_pairs_raw, num_to_keep)
+        print(
+            f"Degrading training set: Kept {len(degraded_train_pairs_raw)} of {len(train_taxonomy_pairs_raw)} edges.")
+    else:
+        degraded_train_pairs_raw = train_taxonomy_pairs_raw
+
+    parent_list, child_list = [], []
+    train_concept_set = set()
+    chd2par_dict = collections.defaultdict(set)
+    taxo_dict = collections.defaultdict(list)
+
+    for pair in degraded_train_pairs_raw:
+        parent, child = process_pair(pair)
+        if parent in concept_id and child in concept_id:
+            parent_id, child_id = concept_id[parent], concept_id[child]
+            parent_list.append(parent_id)
+            child_list.append(child_id)
+            train_concept_set.update([parent_id, child_id])
+            chd2par_dict[child_id].add(parent_id)
+            taxo_dict[parent_id].append(child_id)
+
+    print(f"Processed {len(parent_list)} training edges after degradation.")
+
+    print("Calculating radii based on the new (potentially disconnected) hierarchy...")
+
+    all_children_nodes_full = {
+        child for children in all_taxo_dict.values() for child in children}
+    roots_full = concept_set - all_children_nodes_full
+
+    depths = {}
+    queue = deque([(root, 1) for root in roots_full])
+    visited_for_depth = set(roots_full)
+    for r in roots_full:
+        depths[r] = 1
+
+    while queue:
+        node, depth = queue.popleft()
+        for child in all_taxo_dict.get(node, []):
+            if child not in visited_for_depth:
+                visited_for_depth.add(child)
+                depths[child] = depth + 1
+                queue.append((child, depth + 1))
+
+    memo = {}
+
+    def get_all_descendants(start_node):
+        """Collect descendant identifiers for each node in the taxonomy graph."""
+        if start_node in memo:
+            return memo[start_node]
+        descendants, q, visited = set(), deque(all_taxo_dict.get(start_node, [])
+                                               ), set(all_taxo_dict.get(start_node, []))
+        while q:
+            curr = q.popleft()
+            descendants.add(curr)
+            for c in all_taxo_dict.get(curr, []):
+                if c not in visited:
+                    visited.add(c)
+                    q.append(c)
+        memo[node] = descendants
+        return descendants
+
+    raw_scores = {node: depths.get(
+        node, 1) + np.log2(len(get_all_descendants(node)) + 1) for node in concept_set}
+    all_raw_values = list(raw_scores.values())
+    raw_score_min, raw_score_max = min(all_raw_values), max(all_raw_values)
+    raw_score_range = raw_score_max - \
+        raw_score_min if raw_score_max > raw_score_min else 1.0
+
+    normalized_radii = {
+        node: {'radii': 1.0 - ((score - raw_score_min) / raw_score_range),
+               'depth': depths.get(node),
+               'descendents': len(get_all_descendants(node)),
+               'raw_score_min': raw_score_min,
+               'raw_score_range': raw_score_range}
+        for node, score in raw_scores.items()
+    }
+
+    dic_file = os.path.join(f"../data/{args.dataset}/defs.json")
+    def_dic = json.load(open(dic_file))
+    id_context = {cid: concept.lower() for cid, concept in id_concept.items()}
+
+    test_terms_file = os.path.join(f"../data/{dataset}/{dataset}_test.terms")
+    test_term_lines = load_file(test_terms_file)
+    with open(f"../data/{args.dataset}/test_taxo.json") as f:
+        test_map = json.load(f)
+
+    def get_eval_data(lines):
+        """Construct query nodes and ground-truth parents for evaluation."""
+        concept_ids, gts_ids = [], []
+        for line in lines:
+            _, child_term = line.strip().split("\t")
+            if child_term in concept_id:
+                child_id = concept_id[child_term]
+                parent_terms = test_map.get(child_term, [])
+                parent_ids = [concept_id[p]
+                              for p in parent_terms if p in concept_id]
+                concept_ids.append(child_id)
+                gts_ids.append(parent_ids)
+        return concept_ids, gts_ids
+
+    val_concepts_ids, val_gts_ids = [], []
+    test_concepts_ids, test_gts_ids = get_eval_data(test_term_lines)
+    print(f"Loaded {len(test_concepts_ids)} test concepts.")
+
+    child_parent_pair = list(zip(child_list, parent_list))
+    training_triplets, negative_parent_list = [], []
+
+    for child_id, parent_id in tqdm(child_parent_pair, desc="Generating Triplets"):
+        found_negatives = []
+        hard_candidate_pool = set(taxo_dict.get(parent_id, [])) - {child_id}
+        hard_candidate_pool.update(all_taxo_dict_reverse.get(parent_id, []))
+
+        filtered_hard_candidates = [
+            n for n in hard_candidate_pool if n in train_concept_set]
+        num_hard = min(negsamples, len(filtered_hard_candidates))
+        if num_hard > 0:
+            found_negatives.extend(np.random.choice(
+                filtered_hard_candidates, size=num_hard, replace=False))
+
+        while len(found_negatives) < negsamples:
+            rand_neg = random.choice(list(train_concept_set))
+            if (rand_neg != child_id and rand_neg != parent_id and rand_neg not in found_negatives):
+                found_negatives.append(rand_neg)
+
+        for neg_id in found_negatives:
+            training_triplets.append((child_id, parent_id, neg_id))
+        negative_parent_list.extend(found_negatives)
+
+    child_parent_negative_parent_triple = training_triplets
+    child_neg_parent_pair = [[trip[0], trip[2]] for trip in training_triplets]
+
+    print(
+        f"Generated {len(child_parent_negative_parent_triple)} training triplets.")
+
+    path2root = collections.defaultdict(list)
+
+    with open(f'../levels/{args.dataset}_levels_{completeness_percentage}.json', 'w') as f:
+        json.dump(normalized_radii, f, indent=4)
+
+    return (
+        concept_set, concept_id, id_concept, id_context, train_concept_set, taxo_dict,
+        {}, child_parent_negative_parent_triple, parent_list, child_list,
+        negative_parent_list, all_taxo_dict, path2root, child_parent_pair,
+        child_neg_parent_pair, val_concepts_ids, val_gts_ids, test_concepts_ids, test_gts_ids, normalized_radii
     )
 
 
@@ -771,6 +1190,7 @@ def preprocess(args, outID=True):
     memo = {}
 
     def get_all_descendants(start_node):
+        """Collect descendant identifiers for each node in the taxonomy graph."""
         if start_node in memo:
             return memo[start_node]
         descendants = set()
@@ -954,6 +1374,7 @@ def preprocess(args, outID=True):
 
 
 def create_image_data(args):
+    """Create processed bird image taxonomy data if it is missing."""
     print("Waiting for preprocess image data consisting of paths and labels...")
     concept_set, concept_id, id_concept, id_context, train_concept_set, taxo_dict, negative_parent_dict, child_parent_negative_parent_triple, parent_list, child_list, negative_parent_list, all_taxo_dict, path2root, child_parent_pair, child_neg_parent_pair, val_concept, val_gt, test_concepts_id, test_gt, node_levels, all_labels_set = pre_process_images(
         args)
@@ -995,6 +1416,7 @@ def create_image_data(args):
 
 def create_mag_data(args):
 
+    """Create processed MAG-style taxonomy data if it is missing."""
     print("Waiting for preprocess data....")
 
     concept_set, concept_id, id_concept, id_context, train_concept_set, taxo_dict, negative_parent_dict, child_parent_negative_parent_triple, parent_list, child_list, negative_parent_list, all_taxo_dict, path2root, child_parent_pair, child_neg_parent_pair, val_concept, val_gt, test_concepts_id, test_gt, node_levels = pre_process_mag(
@@ -1036,6 +1458,7 @@ def create_mag_data(args):
 
 def create_data(args, maxlimit=None):
 
+    """Create processed taxonomy data if it is missing."""
     concept_set, concept_id, id_concept, id_context, train_concept_set, train_taxo_dict, negative_parent_dict, train_child_parent_negative_parent_triple, train_parent_list, \
         train_child_list, train_negative_parent_list, train_sibling_dict, train_cousin_dict, train_relative_triple, test_concepts_id, test_gt_id, \
         all_taxo_dict, path2root, sib_pair, child_parent_pair, child_neg_parent_pair, child_sibling_pair, val_concept, val_gt, test_concept, test_gt, levels = preprocess(
@@ -1071,7 +1494,58 @@ def create_data(args, maxlimit=None):
         "val_gt": val_gt,
         "test_concept": test_concept,
         "test_gt": test_gt,
-        "node_levels":levels,}
+        "node_levels": levels, }
+
+    with open("../data/"+str(args.dataset)+"/processed/taxonomy_data_"+str(args.expID)+str(args.negsamples)+str(args.seed)+"_.pkl", "wb") as f:
+        pkl.dump(save_data, f)
+
+    print("Waiting for saving processed data....")
+    time.sleep(3)
+    print("Done!")
+    print(
+        f"From processed data, there are :{len(train_child_parent_negative_parent_triple)} training instances")
+    print(f"From processed data, there are :{len(test_gt_id)} test instances")
+
+
+def create_robustness_data_single_parent(args, robustness, maxlimit=None):
+
+    """Create processed robustness data for single-parent taxonomies."""
+    concept_set, concept_id, id_concept, id_context, train_concept_set, train_taxo_dict, negative_parent_dict, train_child_parent_negative_parent_triple, train_parent_list, \
+        train_child_list, train_negative_parent_list, train_sibling_dict, train_cousin_dict, train_relative_triple, test_concepts_id, test_gt_id, \
+        all_taxo_dict, path2root, sib_pair, child_parent_pair, child_neg_parent_pair, child_sibling_pair, val_concept, val_gt, test_concept, test_gt, levels = preprocess_robustness(
+            args, robustness)
+
+    print("Waiting for preprocess data....")
+    time.sleep(3)
+    print("Done!")
+    save_data = {
+        "concept_set": concept_set,
+        "concept2id": concept_id,
+        "id2concept": id_concept,
+        "id2context": id_context,
+        "all_taxo_dict": all_taxo_dict,
+        "train_concept_set": train_concept_set,
+        "train_taxo_dict": train_taxo_dict,
+        "train_negative_parent_dict": negative_parent_dict,
+        "train_child_parent_negative_parent_triple": train_child_parent_negative_parent_triple,
+        "train_parent_list": train_parent_list,
+        "train_child_list": train_child_list,
+        "train_negative_parent_list": train_negative_parent_list,
+        "train_sibling_dict": train_sibling_dict,
+        "train_cousin_dict": train_cousin_dict,
+        "train_relative_triple": train_relative_triple,
+        "test_concepts_id": test_concepts_id,
+        "test_gt_id": test_gt_id,
+        "path2root": path2root,
+        "sib_pair": sib_pair,
+        "child_parent_pair": child_parent_pair,
+        "child_neg_parent_pair": child_neg_parent_pair,
+        "child_sibling_pair": child_sibling_pair,
+        "val_concept": val_concept,
+        "val_gt": val_gt,
+        "test_concept": test_concept,
+        "test_gt": test_gt,
+        "node_levels": levels, }
 
     with open("../data/"+str(args.dataset)+"/processed/taxonomy_data_"+str(args.expID)+str(args.negsamples)+str(args.seed)+"_.pkl", "wb") as f:
         pkl.dump(save_data, f)
@@ -1087,3 +1561,45 @@ def create_data(args, maxlimit=None):
 if __name__ == '__main__':
     create_child_to_parents_map(
         "../data/psychology/psychology.taxo", "psychology")
+
+
+def create_robustness_data_multiparent(args, retention):
+
+    """Create processed robustness data for multi-parent taxonomies."""
+    print("Waiting for preprocess data....")
+
+    concept_set, concept_id, id_concept, id_context, train_concept_set, taxo_dict, negative_parent_dict, child_parent_negative_parent_triple, parent_list, child_list, negative_parent_list, all_taxo_dict, path2root, child_parent_pair, child_neg_parent_pair, val_concept, val_gt, test_concepts_id, test_gt, node_levels = pre_process_mag_robustness(
+        args, retention)
+    save_data = {
+        "concept_set": concept_set,
+        "concept2id": concept_id,
+        "id2concept": id_concept,
+        "id2context": id_context,
+        "train_concept_set": train_concept_set,
+        "train_taxo_dict": taxo_dict,
+        "all_taxo_dict": all_taxo_dict,
+        "train_negative_parent_dict": negative_parent_dict,
+        "train_child_parent_negative_parent_triple": child_parent_negative_parent_triple,
+        "train_parent_list": parent_list,
+        "train_child_list": child_list,
+        "train_negative_parent_list": negative_parent_list,
+        "test_concepts_id": test_concepts_id,
+        "test_gt_id": test_gt,
+        "path2root": path2root,
+        "child_parent_pair": child_parent_pair,
+        "child_neg_parent_pair": child_neg_parent_pair,
+        "val_concept": val_concept,
+        "val_gt": val_gt,
+        "test_concept": test_concepts_id,
+        "test_gt": test_gt,
+        "node_levels": node_levels
+    }
+
+    with open("../data/"+str(args.dataset)+"/processed/taxonomy_data_"+str(args.expID)+str(args.negsamples)+str(args.seed)+"_.pkl", "wb") as f:
+        pkl.dump(save_data, f)
+
+    print("Waiting for saving processed data....")
+    print("Done!")
+    print(
+        f"From processed data, there are :{len(child_parent_negative_parent_triple)} training instances")
+    print(f"From processed data, there are :{len(test_gt)} test instances")

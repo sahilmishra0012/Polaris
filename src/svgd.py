@@ -4,19 +4,23 @@ import torch.nn.functional as F
 
 class SVGD_Combined_Sphere:
 
+    """SVGD kernel using alignment and repulsion terms on spherical embeddings."""
     def __init__(self, kappa_repel=1.0, kappa_align=5.0, eps=1e-6):
 
+        """Initialize the SVGD_Combined_Sphere object and its experiment state."""
         self.kappa_repel = kappa_repel
         self.kappa_align = kappa_align
         self.eps = eps
 
     def vmf_kernel(self, x, y):
+        """Compute a vMF-inspired similarity kernel."""
         dot_products = torch.matmul(x, y.t())
         k = torch.exp(self.kappa_repel * dot_products)
         grad_k = self.kappa_repel * k.unsqueeze(-1) * y.unsqueeze(0)
         return k, grad_k
 
     def score_fn(self, x, mu):
+        """Compute the score function used by the SVGD update."""
         score_theta = torch.zeros_like(x)
         x_d = x[:, -1]
         score_theta[:, -1] = x_d / (1 - x_d.pow(2) + self.eps)
@@ -26,6 +30,7 @@ class SVGD_Combined_Sphere:
         return score_theta + score_align
 
     def __call__(self, x, mu):
+        """Evaluate the SVGD transform for the provided particles."""
         n_particles = x.size(0)
         k, grad_k_repulsion = self.vmf_kernel(x, x)
 
@@ -42,11 +47,14 @@ class SVGD_Combined_Sphere:
 
 
 class SVGD_vMF_Sphere:
+    """SVGD kernel based on von Mises-Fisher similarities on the sphere."""
     def __init__(self, kappa=1):
 
+        """Initialize the SVGD_vMF_Sphere object and its experiment state."""
         self.kappa = kappa
 
     def vmf_kernel(self, x, y):
+        """Compute a vMF-inspired similarity kernel."""
         dot_products = torch.matmul(x, y.t())
         k = torch.exp(self.kappa * dot_products)
 
@@ -56,6 +64,7 @@ class SVGD_vMF_Sphere:
 
     def __call__(self, x):
 
+        """Evaluate the SVGD transform for the provided particles."""
         n_particles = x.size(0)
         k, grad_k = self.vmf_kernel(x, x)
 
@@ -68,11 +77,14 @@ class SVGD_vMF_Sphere:
 
 
 class SVGD_Uniform_Sphere:
+    """SVGD repulsion kernel that encourages uniform spherical coverage."""
     def __init__(self, bandwidth=1.0):
+        """Initialize the SVGD_Uniform_Sphere object and its experiment state."""
         self.bandwidth = bandwidth
 
     def rbf_kernel(self, x):
 
+        """Compute an RBF kernel and its bandwidth."""
         sq_dist = torch.cdist(x, x, p=2)**2
         h = sq_dist.median() / (2 * torch.log(torch.tensor(x.size(0), dtype=torch.float)))
         h = torch.sqrt(
@@ -86,6 +98,7 @@ class SVGD_Uniform_Sphere:
 
     def __call__(self, x):
 
+        """Evaluate the SVGD transform for the provided particles."""
         k, grad_k = self.rbf_kernel(x)
 
         svgd_grad = torch.sum(k.unsqueeze(-1) * grad_k,
@@ -98,12 +111,15 @@ class SVGD_Uniform_Sphere:
 
 
 class SVGD_IMQ_Sphere:
+    """SVGD inverse multiquadric kernel for spherical particles."""
     def __init__(self, c=1.0, beta=-0.5):
+        """Initialize the SVGD_IMQ_Sphere object and its experiment state."""
         self.c = c
         self.beta = beta
 
     def imq_kernel(self, x, y):
 
+        """Compute an inverse multiquadric kernel and its bandwidth."""
         dot_products = torch.matmul(x, y.t())
 
         base = self.c + 2.0 - 2.0 * dot_products
@@ -117,6 +133,7 @@ class SVGD_IMQ_Sphere:
         return k, grad_k
 
     def __call__(self, x):
+        """Evaluate the SVGD transform for the provided particles."""
         n_particles = x.size(0)
 
         k, grad_k = self.imq_kernel(x, x)
@@ -131,11 +148,14 @@ class SVGD_IMQ_Sphere:
 
 class SVGD_Periodic:
 
+    """SVGD kernel for periodic angular variables."""
     def __init__(self, n_particles, bandwidth=None):
+        """Initialize the SVGD_Periodic object and its experiment state."""
         self.n_particles = n_particles
         self.bandwidth = bandwidth
 
     def periodic_kernel(self, x):
+        """Compute a periodic kernel for angular particles."""
         diff = torch.abs(x.unsqueeze(1) - x.unsqueeze(0))
 
         dist = torch.min(diff, 2 * torch.pi - diff)
@@ -160,6 +180,7 @@ class SVGD_Periodic:
         return k, grad_k
 
     def __call__(self, x):
+        """Evaluate the SVGD transform for the provided particles."""
         k, grad_k = self.periodic_kernel(x)
 
         svgd_grad = torch.sum(grad_k, dim=1) / self.n_particles

@@ -17,6 +17,7 @@ from adjustText import adjust_text
 
 def visualize_concept_clusters(embeddings, concept_ids, id_to_name_map, save_path, n_clusters=12):
 
+    """Project concept embeddings to two dimensions and save a cluster visualization."""
     print(f"Generating UMAP plot for {len(embeddings)} concepts...")
 
     if torch.is_tensor(embeddings):
@@ -88,6 +89,7 @@ def visualize_concept_clusters(embeddings, concept_ids, id_to_name_map, save_pat
 
 
 def build_param_groups(model, lr, weight_decay):
+    """Create optimizer parameter groups with separate learning rates."""
     lat_params = []
     long_params = []
     euclidean_params = []
@@ -127,6 +129,7 @@ def build_param_groups(model, lr, weight_decay):
 
 def plot_concept_space_map(query_info, predicted_info, ground_truth_info, save_path):
 
+    """Save a static plot comparing query, prediction, and ground-truth concept positions."""
     plt.style.use('dark_background')
     fig, ax = plt.subplots(figsize=(10, 10), dpi=150)
 
@@ -199,6 +202,7 @@ def plot_concept_space_map(query_info, predicted_info, ground_truth_info, save_p
 
 
 def plot_static_solar_system(query_info, candidates_info, ground_truth_info, save_path):
+    """Render a static orbital-style visualization of candidate concepts."""
     plt.style.use('dark_background')
     fig, ax = plt.subplots(figsize=(10, 10), dpi=150)
 
@@ -249,6 +253,7 @@ def plot_static_solar_system(query_info, candidates_info, ground_truth_info, sav
             ha='center', va='top', fontsize=9, color='white', fontweight='bold')
 
     def plot_planets(concepts, color, marker, label):
+        """Add orbital markers to an interactive concept-space figure."""
         for concept in concepts:
             x, y = concept_coords[concept['name']]
             ax.scatter(x, y, s=150, c=color, marker=marker,
@@ -281,6 +286,7 @@ def plot_static_solar_system(query_info, candidates_info, ground_truth_info, sav
 
 def plot_interactive_solar_system(query_info, candidates_info, ground_truth_info, save_path, dim='3d'):
 
+    """Render an interactive orbital-style concept visualization."""
     all_concepts = [query_info] + candidates_info + ground_truth_info
 
     unique_concepts = []
@@ -325,6 +331,7 @@ def plot_interactive_solar_system(query_info, candidates_info, ground_truth_info
     fig = go.Figure()
 
     def add_concept_trace(concepts, name, symbol, color, size):
+        """Add a concept embedding trace to an interactive plot."""
         for concept in concepts:
             x, y, z = concept_coords[concept['name']]
             hover_text = f"<b>{concept['name']}</b><br>Type: {name}<br>Radius: {concept['radius']:.3f}"
@@ -408,6 +415,7 @@ def plot_interactive_solar_system(query_info, candidates_info, ground_truth_info
 
 
 def plot_radii_comparison(query_info, top_candidates_info, save_path, principle='traditional'):
+    """Plot normalized radii for query and candidate concepts."""
     fig, ax = plt.subplots(figsize=(8, 8), dpi=150)
 
     all_concepts = [query_info] + top_candidates_info
@@ -460,6 +468,7 @@ def plot_radii_comparison(query_info, top_candidates_info, save_path, principle=
 
 
 def cartesian_to_spherical_angles(e: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Convert Cartesian vectors into spherical angular coordinates."""
     batch_size, d = e.shape
 
     if d < 4:
@@ -488,17 +497,19 @@ def cartesian_to_spherical_angles(e: torch.Tensor) -> tuple[torch.Tensor, torch.
     theta = angles[:, -1]
     psi1 = angles[:, -2]
     psi2 = angles[:, -3]
-    psi_d= angles[:,0]
+    psi_d = angles[:, 0]
 
-    return theta, psi1, psi2,psi_d
+    return theta, psi1, psi2, psi_d
 
 
 def get_long_angle(mu):
 
+    """Return the longitudinal angle for a Cartesian vector."""
     return np.arctan2(mu[-1], mu[-1])
 
 
 def visualize_angles(mu_q, mu_p, mu_t1, mu_t2, fname):
+    """Visualize angular coordinates for spherical embeddings."""
     angle_q = get_long_angle(mu_q)
     angle_p = get_long_angle(mu_p)
     angle_t1 = get_long_angle(mu_t1)
@@ -543,6 +554,7 @@ def visualize_angles(mu_q, mu_p, mu_t1, mu_t2, fname):
 
 
 def bert_embedding_to_spherical(e):
+    """Map BERT-style embeddings to normalized spherical coordinates."""
     norm = torch.norm(e, p=2, dim=1, keepdim=True)
     unit_vectors = e / (norm + 1e-9)
 
@@ -580,6 +592,7 @@ def bert_embedding_to_spherical(e):
 
 
 def spherical_to_cartesian(angles, radius=1.0):
+    """Convert spherical angles to Cartesian coordinates."""
     sin_angles = torch.sin(angles)
     cos_angles = torch.cos(angles)
 
@@ -598,6 +611,7 @@ def spherical_to_cartesian(angles, radius=1.0):
 
 
 def set_seed(seed):
+    """Set Python, NumPy, and PyTorch random seeds for reproducible runs."""
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -605,6 +619,7 @@ def set_seed(seed):
 
 
 def print_aoe_time():
+    """Print the current wall-clock time in a human-readable format."""
     utc_dt = datetime.now(timezone.utc)
     aoe_tz = timezone(timedelta(hours=-12))  # AoE = UTC - 12
     aoe_dt = utc_dt.astimezone(aoe_tz)
@@ -613,6 +628,7 @@ def print_aoe_time():
 
 
 def accuracy(pred, gt, tr, te):
+    """Compute top-k classification accuracy."""
     preds = np.array(list(pred[:, 0]))
     gts = np.array(list(gt))
     acc = np.sum(preds == gts)/len(gt)
@@ -624,6 +640,7 @@ def accuracy(pred, gt, tr, te):
 
 
 def precision_k(pred, gt, k):
+    """Compute precision at k for ranked predictions."""
     preds = np.array(list(pred[:, :k]))
     gts = np.array(list(gt))
     val = np.sum(preds == gts[:, np.newaxis])*1.0/(len(gt)*k)
@@ -631,6 +648,7 @@ def precision_k(pred, gt, k):
 
 
 def prec_rec_multimodal(pred, gt, k):
+    """Compute precision and recall for multimodal taxonomy predictions."""
     preds = np.array(pred)
     gts = np.array(gt).flatten()
 
@@ -652,6 +670,7 @@ def prec_rec_multimodal(pred, gt, k):
 
 
 def precision_k_multimodal(pred, gt, k):
+    """Compute multimodal precision at k."""
     preds = np.array(pred)
     gts = np.array(gt)
 
@@ -671,6 +690,7 @@ def precision_k_multimodal(pred, gt, k):
 
 
 def recall_k_multimodal(pred, gt, k):
+    """Compute multimodal recall at k."""
     gts = np.array(gt)
     preds = np.array(pred)
 
@@ -690,6 +710,7 @@ def recall_k_multimodal(pred, gt, k):
 
 
 def hits_at_k_multi_p(pred, gt, k):
+    """Compute hits at k for multi-parent taxonomy evaluation."""
     num_queries = len(gt)
     if num_queries == 0:
         return 0.0
@@ -712,6 +733,7 @@ def hits_at_k_multi_p(pred, gt, k):
 
 def recall_k_multi_p(pred, gt, k):
 
+    """Compute recall at k for multi-parent taxonomy evaluation."""
     total_hits = 0
     num_triplets = 0
 
@@ -735,6 +757,7 @@ def recall_k_multi_p(pred, gt, k):
 
 
 def recall_k(pred, gt, k):
+    """Compute recall at k for single-parent taxonomy evaluation."""
     num_queries = len(gt)
     if num_queries == 0:
         return 0.0
@@ -749,6 +772,7 @@ def recall_k(pred, gt, k):
 
 
 def rank_scores(pred, gt):
+    """Return rank positions for single-parent predictions."""
     mrr = 0
     mr = 0
     dcg = 0.0
@@ -772,6 +796,7 @@ def rank_scores(pred, gt):
 
 
 def rank_scores_multi_p(pred, gt):
+    """Return rank positions for multi-parent predictions."""
     total_mrr = 0.0
     total_mr = 0.0
     num_triplets = 0
@@ -804,6 +829,7 @@ def rank_scores_multi_p(pred, gt):
 
 
 def mrr_score(pred, gt):
+    """Compute mean reciprocal rank from ranked predictions."""
     mrr = 0
     for i in range(len(pred)):
         for j in range(len(pred[i])):
@@ -815,6 +841,7 @@ def mrr_score(pred, gt):
 
 def wu_p_score(pred, gt, path2root, compiled):
 
+    """Compute Wu-Palmer style similarity for predicted taxonomy paths."""
     pred = np.squeeze(pred[:, 0])
     wu_p = 0
     for i in range(len(pred)):
@@ -834,10 +861,12 @@ def wu_p_score(pred, gt, path2root, compiled):
 
 def f1_score(precision, recall):
 
+    """Compute F1 score from precision and recall."""
     return (2*precision*recall)/(precision+recall)
 
 
 def metrics_multi_modal(indices, gt, candidate_list, id_concept, test_concepts_id):
+    """Aggregate evaluation metrics for multimodal taxonomy prediction."""
     ind = np.squeeze(indices.detach().cpu().numpy())
     x, y = ind.shape
 
@@ -856,6 +885,7 @@ def metrics_multi_modal(indices, gt, candidate_list, id_concept, test_concepts_i
 
 
 def metrics_multi_p(indices, gt, candidate_list, id_concept, test_concepts_id):
+    """Aggregate evaluation metrics for multi-parent taxonomy prediction."""
     ind = np.squeeze(indices.detach().cpu().numpy())
     x, y = ind.shape
 
@@ -878,6 +908,7 @@ def metrics_multi_p(indices, gt, candidate_list, id_concept, test_concepts_id):
 
 
 def metrics(indices, gt, train_concept_set, path2root, testid2concept, trainid2concept, testconcepts, sortedscores):
+    """Aggregate evaluation metrics for single-parent taxonomy prediction."""
     ind = np.squeeze(indices.detach().cpu().numpy())
     x, y = ind.shape
     pred = np.array([[i for i in range(y)] for _ in range(x)])

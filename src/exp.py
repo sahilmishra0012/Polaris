@@ -30,7 +30,9 @@ os.environ["WANDB_MODE"] = "online"
 
 class Experiments(object):
 
+    """Training, evaluation, and analysis driver for PolarTaxo experiments."""
     def __init__(self, args):
+        """Initialize the Experiments object and its experiment state."""
         super(Experiments, self).__init__()
 
         self.args = args
@@ -61,6 +63,7 @@ class Experiments(object):
         print(self.args)
 
     def __load_tokenizer__(self):
+        """Load the tokenizer that matches the configured backbone model."""
         if self.args.dataset == 'birds':
             print("Loading CLIP Tokenizer...")
             tokenizer = open_clip.get_tokenizer(
@@ -76,6 +79,7 @@ class Experiments(object):
         return tokenizer
 
     def _select_optimizer(self):
+        """Select the optimizer used for Euclidean or spherical training."""
         parameters = [{"params": [p for n, p in self.model.named_parameters()],
                        "weight_decay": 0.0},]
         if self.args.implement_rectangular_opt is True:
@@ -89,11 +93,13 @@ class Experiments(object):
         return optimizer
 
     def _set_device(self):
+        """Move the model to CUDA when requested."""
         if self.args.cuda:
             self.model = self.model.cuda()
 
     def train_one_step(self, it, encode_parent, encode_child, encode_negative):
 
+        """Run one optimization step for a mini-batch."""
         self.model.train()
 
         loss, taxo_loss, svgd_loss = self.model(
@@ -124,6 +130,7 @@ class Experiments(object):
         return loss, svgd_loss, taxo_grads_to_log
 
     def train(self, checkpoint=None, save_path=None):
+        """Train PolarTaxo and periodically evaluate/save checkpoints."""
         time_tracker = []
         test_acc = test_mrr = test_wu_p = 0
         old_test_acc = old_test_mrr = old_test_wu_p = 0
@@ -247,6 +254,7 @@ class Experiments(object):
 
     def get_pos_from_h_theta(self, h, theta):
 
+        """Convert radial height and direction vectors into Cartesian positions."""
         r = self.args.r_0 * torch.exp(h)
 
         theta_norm = torch.norm(theta, p=2, dim=1, keepdim=True)
@@ -257,6 +265,7 @@ class Experiments(object):
 
     def predict_multimodal(self, tag=None, path=None
                            ):
+        """Evaluate multimodal image-to-taxonomy predictions."""
         print("Prediction starting....")
         store_csv = False
         if tag == 'test' and path:
@@ -323,6 +332,7 @@ class Experiments(object):
         return test_metrics
 
     def predict_rectangular(self, tag=None, path=None):
+        """Evaluate the rectangular polar-coordinate ablation."""
         print("prediction starting....")
 
         store_csv = False
@@ -414,6 +424,7 @@ class Experiments(object):
         return test_metrics
 
     def predict(self, tag=None, path=None):
+        """Evaluate taxonomy prediction by ranking candidate spherical similarities."""
         print("Prediction starting.....")
         store_csv = False
         if tag == "test" and path:
@@ -519,6 +530,7 @@ class Experiments(object):
         return test_metrics
 
     def level_wise_prediction(self, tag=None, path=None):
+        """Evaluate level-aware orbital predictions using angular and radial scores."""
         print("Prediction starting....")
         store_csv = False
 
@@ -573,10 +585,16 @@ class Experiments(object):
                                              for cid in candidate_list]).to(q_z.device)
             candidate_descendants = torch.tensor([
                 self.test_set.levels[cid]['descendents'] for cid in candidate_list]).to(q_z.device)
-            score_min = self.test_set.levels[0]['raw_score_min']
-            score_range = self.test_set.levels[0]['raw_score_range']
 
+            if self.test_set.levels:
+                first_level_item = next(iter(self.test_set.levels.values()))
+                score_min = first_level_item['raw_score_min']
+                score_range = first_level_item['raw_score_range']
+            else:
+                score_min = 0
+                score_range = 1
             candidate_radii_list = list()
+            start = time.time()
             for i in tqdm(range(num_queries), desc='evaluating queries'):
                 q_sph = q_z[i].unsqueeze(0).expand(num_candidates, -1)
 
@@ -609,7 +627,7 @@ class Experiments(object):
                 score_list.append(final_score)
                 candidate_radii_list.append(candidate_radius_normalized)
                 query_radii_list.append(query_radius_normalized)
-
+            end = time.time()
             print(candidate_radii_list[2][:10])
 
             score_matrix = torch.stack(score_list, dim=0)
@@ -675,6 +693,8 @@ class Experiments(object):
                       'Hit@10:{:.05f}'.format(test_metrics["Prec@10"]),
                       'Recall@5:{:.05f}'.format(test_metrics["Recall@5"]),
                       'Recall@10: {:.05f}'.format(test_metrics["Recall@10"]))
+
+                print("Time Interval: ", end-start)
             else:
                 test_metrics = metrics(
                     indices,
@@ -708,6 +728,7 @@ class Experiments(object):
 
     def visualize_angle_distributions(self, tag=None, path=None):
 
+        """Plot distributions of learned candidate spherical angles."""
         print("Starting global distribution analysis for Candidates...")
         if tag == "test" and path:
             print(f"Loading model from: {path}")
@@ -738,6 +759,7 @@ class Experiments(object):
             candidates_sphere = torch.cat(candidates_sphere_list, dim=0)
 
             print("All embeddings loaded. Calculating angles...")
+
             c_thetas, c_psi1s, c_psi2s, c_psid = cartesian_to_spherical_angles(
                 candidates_sphere)
 
@@ -792,6 +814,7 @@ class Experiments(object):
             plt.close()
 
     def generate_embeddings_and_plot(self, path=None, n_clusters=15):
+        """Generate candidate embeddings and save a UMAP cluster plot."""
         print("Visualization: Loading model and generating embeddings...")
 
         if path:
@@ -828,6 +851,7 @@ class Experiments(object):
 
     def analyze_variances(self, tag=None, path=None):
 
+        """Analyze and plot projection-layer weight variance."""
         print("Starting variance analysis...")
         if tag == "test" and path:
             print(f"Loading model from: {path}")
@@ -877,6 +901,7 @@ class Experiments(object):
 
     def generate_case_study(self, tag='test', path=None, output_path='case_studies.csv'):
 
+        """Write a CSV with top-ranked predictions for qualitative case studies."""
         print(f"Generating Case Study CSV at: {output_path}...")
 
         output_path = f"{self.args.dataset}_case_studies.csv"
@@ -946,7 +971,8 @@ class Experiments(object):
 
                     radius_score = torch.where(
                         angular_score > 1-(self.args.potential_strength*(radius_diff**2)), 1.0, 0.0)
-                    final_score = radius_score*angular_score
+                    final_score = angular_score - \
+                        self.args.potential_strength*(radius_diff**2)
 
                     top_vals, top_indices = torch.topk(final_score, k=5)
                     top_indices = top_indices.cpu().numpy()
@@ -975,6 +1001,7 @@ class Experiments(object):
         print(f"Case studies saved successfully to {output_path}")
 
     def plot_kappa_vs_depth(self, tag=None, path=None):
+        """Plot predicted vMF concentration against taxonomy depth."""
         print("Starting Kappa vs. Depth Analysis (Aggregated)...")
 
         if path:
@@ -1044,7 +1071,7 @@ class Experiments(object):
         plt.title(
             f'Semantic Certainty vs. Depth: {self.args.dataset}\n(Median Trend Correlation: {median_corr:.2f})')
         plt.xlabel('Hierarchical Depth')
-        plt.ylabel('Concentration Parameter ($\kappa$)')
+        plt.ylabel(r'Concentration Parameter ($\kappa$)')
         plt.grid(axis='y', linestyle='--', alpha=0.5)
 
         filename = f"kappa_vs_depth_{self.args.dataset}.pdf"

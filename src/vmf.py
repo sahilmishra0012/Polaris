@@ -10,6 +10,7 @@ except ImportError:
 
 
 def log_i0_stable(x):
+    """Compute a numerically stable approximation to log(I0(kappa))."""
     threshold = 20.0
 
     mask = x < threshold
@@ -25,15 +26,18 @@ def log_i0_stable(x):
 
 
 def log_Z_d(kappa, d):
+    """Compute the log normalizing constant for a vMF distribution."""
     log_bessel_func = log_i0_stable(kappa)
     return (((d/2)-1)*torch.log(kappa))-((torch.tensor(0.5)*d*math.log(2*math.pi))-log_bessel_func)
 
 
 def A_d(kappa, dim):
+    """Compute the vMF mean resultant length approximation."""
     return (1-(dim-1))/(2*kappa+1e-8)
 
 
 def vmf_kl_divergence(mu1, kappa1, mu2, kappa2, dim):
+    """Compute the KL divergence between vMF distributions."""
     log_Z_1 = log_Z_d(kappa1, dim)
     log_Z_2 = log_Z_d(kappa2, dim)
 
@@ -49,7 +53,9 @@ def vmf_kl_divergence(mu1, kappa1, mu2, kappa2, dim):
 
 
 class VMFRegularisation(nn.Module):
+    """Regularization module for vMF-style spherical uncertainty parameters."""
     def __init__(self, args, embedding_dim, hidden_dim=64):
+        """Initialize the VMFRegularisation object and its experiment state."""
         super(VMFRegularisation, self).__init__()
 
         self.embedding_dim = embedding_dim
@@ -60,6 +66,7 @@ class VMFRegularisation(nn.Module):
         self.args = args
 
     def forward(self, p_emb, c_emb, n_emb, margin):
+        """Run the forward pass and return loss terms."""
         if self.args.learn_mu == 0:
             mu_p = p_emb
             mu_c = c_emb

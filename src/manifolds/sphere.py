@@ -3,7 +3,9 @@ from manifolds.base import Manifold
 
 
 class Sphere(Manifold):
+    """Sphere manifold operations used by PolarTaxo projection layers."""
     def __init__(self):
+        """Initialize the Sphere object and its experiment state."""
         super(Sphere, self).__init__()
 
         self.name = 'Sphere'
@@ -12,23 +14,27 @@ class Sphere(Manifold):
         self.eps = 1e-6
 
     def proj_tan(self, x, v, c=0):
+        """Project vectors onto the tangent space at a point on the sphere."""
         dot_product = torch.sum(x*v, dim=-1, keepdim=True)
 
         return v-dot_product*x
 
     def expmap(self, x, v):
+        """Map tangent vectors to the sphere with the exponential map."""
         norm_v = torch.norm(v, p=2, dim=-1, keepdim=True).clamp(min=self.eps)
 
         exp_result = torch.cos(norm_v)*x+torch.sin(norm_v)*(v/norm_v)
         return exp_result
 
     def expmap_retracted(self, x, v, c=0):
+        """Map tangent vectors to the sphere with a normalized retraction."""
         s = x+v
         exp_result = s/torch.norm(s, p=2, dim=1).unsqueeze(1)
 
         return exp_result
 
     def logmap(self, x, y, c=0):
+        """Map points on the sphere back to the tangent space."""
         v = self.proj_tan(x, y)
         norm_v = torch.norm(
             v, p=2, dim=-1, keepdim=True).clamp_min(min=self.min_norm)
@@ -40,4 +46,5 @@ class Sphere(Manifold):
         return distance*(v/norm_v)
 
     def parallel_transport(self, x, y, v):
+        """Transport tangent vectors between two points on the sphere."""
         return self.proj_tan(y, v)

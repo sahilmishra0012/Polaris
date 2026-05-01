@@ -16,6 +16,7 @@ def create_image_triplets(image_path):
     #             print("Deleting:", path)
     #             os.remove(path)
 
+    """Create image-child, parent-label, and negative-label triplets for the bird taxonomy."""
     categories = os.listdir(image_path)
     categories_sampled = random.sample(categories, k=25)
 

@@ -5,10 +5,9 @@ import numpy as np
 import sys
 import torch.nn as nn
 from utils import *
-from layers import MLP, SphericalMLP
-from transformers import BertModel, AutoModel, DistilBertModel, DistilBertTokenizer
+from layers import SphericalMLP
+from transformers import BertModel, AutoModel
 import torch.nn.functional as F
-import matplotlib.pyplot as plt
 from vmf import VMFRegularisation
 from manifolds.sphere import Sphere
 from svgd import *
@@ -16,7 +15,9 @@ import open_clip
 
 
 class PolarTaxo(nn.Module):
+    """Polar orbital embedding model for taxonomy representation learning on spheres."""
     def __init__(self, args):
+        """Initialize the PolarTaxo object and its experiment state."""
         super(PolarTaxo, self).__init__()
 
         self.args = args
@@ -40,6 +41,7 @@ class PolarTaxo(nn.Module):
         self.register_buffer("pole", pole.unsqueeze(0))
 
     def __load_pre_trained__(self):
+        """Load the configured pretrained language model backbone."""
         if self.args.model == 'bert':
             model = BertModel.from_pretrained(
                 '/home/models/bert-base-uncased')
@@ -50,6 +52,7 @@ class PolarTaxo(nn.Module):
         return model
 
     def get_image_cls(self, encode_inputs):
+        """Encode image inputs with the pretrained multimodal backbone."""
         with torch.no_grad():
             encode_inputs = encode_inputs.view(encode_inputs.size(
                 0), encode_inputs.size(2), encode_inputs.size(3), encode_inputs.size(4))
@@ -59,6 +62,7 @@ class PolarTaxo(nn.Module):
         return image_embedding
 
     def get_label_cls(self, encode_inputs):
+        """Encode text label inputs with the pretrained multimodal backbone."""
         with torch.no_grad():
             encode_inputs = encode_inputs.view(
                 encode_inputs.size(0), encode_inputs.size(2))
@@ -68,6 +72,7 @@ class PolarTaxo(nn.Module):
         return text_embedding
 
     def get_cls(self, encode_inputs):
+        """Extract CLS-style text embeddings from the configured language model."""
         if self.args.model == 'snowflake':
             cls_embed = self.pre_train_model(
                 **encode_inputs).last_hidden_state[:, 0]
@@ -80,6 +85,7 @@ class PolarTaxo(nn.Module):
         return cls_embed
 
     def multimodal_parent_projection(self, cls_embed):
+        """Project candidate label embeddings onto the learned spherical space."""
         cls_embeddings = self.get_label_cls(cls_embed)
         v = self.manifold.proj_tan(self.pole, cls_embeddings)
         v_sphere = self.manifold.expmap_retracted(self.pole, v)
@@ -89,6 +95,7 @@ class PolarTaxo(nn.Module):
         return e
 
     def multimodal_child_projection(self, cls_embed):
+        """Project image query embeddings onto the learned spherical space."""
         cls_embeddings = self.get_image_cls(cls_embed)
         v = self.manifold.proj_tan(self.pole, cls_embeddings)
         v_sphere = self.manifold.expmap_retracted(self.pole, v)
@@ -98,6 +105,7 @@ class PolarTaxo(nn.Module):
         return e
 
     def direct_projection_child(self, cls_embed):
+        """Convert child embeddings directly into polar coordinates."""
         cls_embeddings = self.get_cls(cls_embed)
 
         psi, theta = self.to_polar(cls_embeddings)
@@ -109,6 +117,7 @@ class PolarTaxo(nn.Module):
         return psi, theta
 
     def direct_projection_parent(self, cls_embed):
+        """Convert parent embeddings directly into polar coordinates."""
         cls_embeddings = self.get_cls(cls_embed)
 
         psi, theta = self.to_polar(cls_embeddings)
@@ -118,6 +127,7 @@ class PolarTaxo(nn.Module):
 
     def par_projection(self, cls_embed):
 
+        """Project parent or candidate text embeddings onto the learned sphere."""
         cls_embeddings = self.get_cls(cls_embed)
         v = self.manifold.proj_tan(self.pole, cls_embeddings)
         v_sphere = self.manifold.expmap_retracted(self.pole, v)
@@ -128,6 +138,7 @@ class PolarTaxo(nn.Module):
 
     def child_projection(self, cls_embed):
 
+        """Project child or query text embeddings onto the learned sphere."""
         cls_embeddings = self.get_cls(cls_embed)
         v = self.manifold.proj_tan(self.pole, cls_embeddings)
         v_sphere = self.manifold.expmap_retracted(self.pole, v)
@@ -138,6 +149,7 @@ class PolarTaxo(nn.Module):
 
     def to_polar(self, e):
 
+        """Convert normalized Cartesian embeddings into polar angular coordinates."""
         batch_size, d = e.shape
         if d < 2:
             raise ValueError(
@@ -175,6 +187,7 @@ class PolarTaxo(nn.Module):
         return psi, theta.unsqueeze(1)
 
     def normalize_spherical_weights(self):
+        """Renormalize spherical projection-layer weights after an optimizer step."""
         self.parent_sphere.l1.normalize_weights()
         self.parent_sphere.l2.normalize_weights()
         self.child_sphere.l1.normalize_weights()
@@ -182,9 +195,11 @@ class PolarTaxo(nn.Module):
 
     def angular_loss(self, psi1, psi2):
 
+        """Compute aggregate latitudinal angular distance."""
         return torch.sum(torch.abs(psi1-psi2), dim=1)
 
     def longitudinal_loss(self, theta1, theta2):
+        """Compute wrapped longitudinal angular distance."""
         diff = torch.abs(theta1-theta2)
         wrap_diff = 2*torch.pi-diff
 
@@ -194,12 +209,14 @@ class PolarTaxo(nn.Module):
 
     def welsch_loss(self, d):
 
+        """Compute the Welsch robust loss for angular distances."""
         w_loss = (self.args.c**2/2)*(1 -
                                      torch.exp(-(d**2/(2*self.args.c**2))))
 
         return w_loss
 
     def forward(self, step, encode_parent, encode_child, encode_negative):
+        """Run the forward pass and return loss terms."""
         if self.args.implement_rectangular_opt is True:
             # Geometric
             parent_psi, parent_theta = self.direct_projection_parent(
@@ -269,33 +286,35 @@ class PolarTaxo(nn.Module):
             loss_vmf, mu_p, mu_c, mu_n = self.vmf_regulariser(
                 parent_sphere, child_sphere, negative_sphere, self.args.vmf_margin)
 
-            k_repel = self.args.kappa_repel
-            k_align = self.args.kappa_align
+            if self.args.detach_svgd == 0:
+                if self.args.kernel_setting == 'radial':
+                    svgd_combined = SVGD_Uniform_Sphere()
 
-            if self.args.kernel_setting == 'radial':
-                svgd_combined = SVGD_Uniform_Sphere()
+                    parent_svgd_grad = svgd_combined(parent_sphere)
+                    child_svgd_grad = svgd_combined(child_sphere)
+                    negative_svgd_grad = svgd_combined(negative_sphere)
 
-                parent_svgd_grad = svgd_combined(parent_sphere)
-                child_svgd_grad = svgd_combined(child_sphere)
-                negative_svgd_grad = svgd_combined(negative_sphere)
+                elif self.args.kernel_setting == 'vmf':
+                    svgd_combined = SVGD_vMF_Sphere()
 
-            elif self.args.kernel_setting == 'vmf':
-                svgd_combined = SVGD_vMF_Sphere()
+                    parent_svgd_grad = svgd_combined(parent_sphere)
+                    child_svgd_grad = svgd_combined(child_sphere)
+                    negative_svgd_grad = svgd_combined(negative_sphere)
 
-                parent_svgd_grad = svgd_combined(parent_sphere)
-                child_svgd_grad = svgd_combined(child_sphere)
-                negative_svgd_grad = svgd_combined(negative_sphere)
+                elif self.args.kernel_setting == 'imq':
 
-            elif self.args.kernel_setting == 'imq':
-                svgd_combined = SVGD_IMQ_Sphere()
+                    svgd_combined = SVGD_IMQ_Sphere()
 
-                parent_svgd_grad = svgd_combined(parent_sphere)
-                child_svgd_grad = svgd_combined(child_sphere)
-                negative_svgd_grad = svgd_combined(negative_sphere)
+                    parent_svgd_grad = svgd_combined(parent_sphere)
+                    child_svgd_grad = svgd_combined(child_sphere)
+                    negative_svgd_grad = svgd_combined(negative_sphere)
 
-            elif self.args.kernel_setting == 'vmf_theta':
-                svgd_combined = SVGD_Combined_Sphere(
-                    kappa_align=k_align, kappa_repel=k_repel)
+                elif self.args.kernel_setting == 'vmf_theta':
+                    k_repel = self.args.kappa_repel
+                    k_align = self.args.kappa_align
+                    svgd_combined = SVGD_Combined_Sphere(
+                        kappa_align=k_align, kappa_repel=k_repel)
+
                 if self.args.experiment_setting == 'constant_svgd':
                     parent_svgd_grad = svgd_combined(
                         parent_sphere, parent_sphere)
@@ -314,5 +333,11 @@ class PolarTaxo(nn.Module):
                     child_svgd_grad.norm(p=2, dim=1).mean() + \
                     negative_svgd_grad.norm(p=2, dim=1).mean()
                 final_loss = taxo_loss+(self.args.svgd_weight*svgd_loss)
+            else:
+                taxo_loss = self.args.geometric_weight * \
+                    F.relu(welsch_cp-welsch_cn+self.args.beta).mean() + \
+                    (1-self.args.geometric_weight)*loss_vmf
+                final_loss = taxo_loss
+                svgd_loss = torch.tensor(0)
 
         return final_loss, taxo_loss, svgd_loss

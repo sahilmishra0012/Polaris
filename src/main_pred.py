@@ -6,8 +6,7 @@ from utils import *
 from exp import Experiments
 from utils import print_aoe_time, set_seed
 import os
-
-# os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
+os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 
 
 parser = argparse.ArgumentParser()
@@ -83,6 +82,8 @@ parser.add_argument('--entity', type=str,
                     default='entity', help='wandb entity')
 parser.add_argument('--checkpoint_path', type=str,
                     default=None, help='checkpoint path to resume training')
+parser.add_argument('--model_path', type=str,
+                    default=None, help='model path for predictions')
 parser.add_argument('--experiment_setting', type=str,
                     default='standard', help='experiment setting for SVGD')
 parser.add_argument('--kernel_setting', type=str,
@@ -102,10 +103,8 @@ print_aoe_time()
 args = parser.parse_args()
 args.cuda = True  # inference
 
-torch.cuda.set_device(args.gpu_id)
 
-print(args)
+torch.cuda.set_device(args.gpu_id)
 exp = Experiments(args)
-args.is_multi_parent = False
-exp.plot_kappa_vs_depth(
-    tag='test', path='../final_result/environment/independent_seed_runs/experiment_environment_20_0.3_512_0.7_0.4_0.3_2.0_1.0_vmf_theta_0.1_40.pt')
+exp.level_wise_prediction(
+    tag='test', path=args.model_path)

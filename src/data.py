@@ -10,8 +10,10 @@ from PIL import Image
 
 class Data_TRAIN_MAG(Dataset):
 
+    """PyTorch training dataset for multi-parent MAG-style taxonomies."""
     def __init__(self, args, tokenizer):
 
+        """Initialize the Data_TRAIN_MAG object and its experiment state."""
         super(Data_TRAIN_MAG, self).__init__()
 
         self.args = args
@@ -44,6 +46,7 @@ class Data_TRAIN_MAG(Dataset):
 
     def __load_data__(self, dataset):
 
+        """Load the serialized processed taxonomy data for this dataset."""
         with open(os.path.join("../data/", dataset, "processed", "taxonomy_data_"+str(self.args.expID)+str(self.args.negsamples)+str(self.args.seed)+"_.pkl"), "rb") as f:
             data = pkl.load(f)
 
@@ -70,6 +73,7 @@ class Data_TRAIN_MAG(Dataset):
 
     def generate_all_token_ids(self, tokenizer):
 
+        """Tokenize all concept contexts used as candidate taxonomy nodes."""
         if self.args.model == 'e5':
             all_nodes_context = ["query: "+self.id_context[cid]
                                  for cid in self.concept_set]
@@ -113,6 +117,7 @@ class Data_TRAIN_MAG(Dataset):
 
     def index_token_ids(self, encode_dic, index):
 
+        """Select tokenized tensors for one or more concept indices."""
         if self.args.model == 'bert':
             input_ids, token_type_ids, attention_mask = encode_dic[
                 "input_ids"], encode_dic["token_type_ids"], encode_dic["attention_mask"]
@@ -137,6 +142,7 @@ class Data_TRAIN_MAG(Dataset):
 
     def generate_parent_child_token_ids(self, index):
 
+        """Return encoded parent, child, and negative-parent inputs for training."""
         child_id, parent_id, negative_parent_id = self.train_child_parent_negative_parent_triple[
             index]
         encode_child = self.index_token_ids(self.encode_all, child_id)
@@ -149,6 +155,7 @@ class Data_TRAIN_MAG(Dataset):
         return encode_parent, encode_child, encode_negative_parents
 
     def __getitem__(self, index):
+        """Return the encoded sample at the requested dataset index."""
         encode_parent, encode_child, encode_negative_parents = self.generate_parent_child_token_ids(
             index)
 
@@ -156,13 +163,16 @@ class Data_TRAIN_MAG(Dataset):
 
     def __len__(self):
 
+        """Return the number of available samples."""
         return len(self.train_child_parent_negative_parent_triple)
 
 
 class Data_TEST_MAG(Dataset):
 
+    """PyTorch candidate/query dataset for multi-parent MAG-style evaluation."""
     def __init__(self, args, tokenizer):
 
+        """Initialize the Data_TEST_MAG object and its experiment state."""
         super(Data_TEST_MAG, self).__init__()
 
         self.args = args
@@ -194,6 +204,7 @@ class Data_TEST_MAG(Dataset):
 
     def __load_data__(self, dataset):
 
+        """Load the serialized processed taxonomy data for this dataset."""
         with open(os.path.join("../data/", dataset, "processed", "taxonomy_data_"+str(self.args.expID)+str(self.args.negsamples)+str(self.args.seed)+"_.pkl"), "rb") as f:
             data = pkl.load(f)
 
@@ -201,6 +212,7 @@ class Data_TEST_MAG(Dataset):
 
     def generate_all_token_ids(self, tokenizer):
 
+        """Tokenize all concept contexts used as candidate taxonomy nodes."""
         if self.args.model == 'e5':
             all_nodes_context = ["query: "+self.id_context[cid]
                                  for cid in self.concept_set]
@@ -263,6 +275,7 @@ class Data_TEST_MAG(Dataset):
 
     def generate_test_token_ids(self, tokenizer, test_concepts_id):
 
+        """Tokenize held-out query concepts for evaluation."""
         if self.args.model == 'e5':
             test_nodes_context = ["query: "+self.id_context[cid]
                                   for cid in test_concepts_id]
@@ -302,6 +315,7 @@ class Data_TEST_MAG(Dataset):
 
     def index_token_ids(self, encode_dic, index):
 
+        """Select tokenized tensors for one or more concept indices."""
         if self.args.model == 'bert':
             input_ids, token_type_ids, attention_mask = encode_dic[
                 "input_ids"], encode_dic["token_type_ids"], encode_dic["attention_mask"]
@@ -320,17 +334,21 @@ class Data_TEST_MAG(Dataset):
 
     def __getitem__(self, index):
 
+        """Return the encoded sample at the requested dataset index."""
         candidate_ids = self.true_concept_set[index]
         encode_candidate = self.index_token_ids(self.encode_all, candidate_ids)
         # encode_candidate_path = self.index_token_ids(self.encode_all_paths,candidate_ids)
         return encode_candidate
 
     def __len__(self):
+        """Return the number of available samples."""
         return len(self.true_concept_set)
 
 
 class Data_TRAIN_Birds(Dataset):
+    """PyTorch training dataset for image-to-label bird taxonomy learning."""
     def __init__(self, args):
+        """Initialize the Data_TRAIN_Birds object and its experiment state."""
         super(Data_TRAIN_Birds, self).__init__()
 
         self.args = args
@@ -358,12 +376,14 @@ class Data_TRAIN_Birds(Dataset):
             len(self.train_child_parent_negative_parent_triple)))
 
     def __load_data__(self, dataset):
+        """Load the serialized processed taxonomy data for this dataset."""
         with open(os.path.join("../data/", dataset, "processed", "taxonomy_data_"+str(self.args.expID)+str(self.args.negsamples)+"_.pkl"), "rb") as f:
             data = pkl.load(f)
 
         return data
 
     def generate_parent_child_token_ids(self, index):
+        """Return encoded parent, child, and negative-parent inputs for training."""
         child_id, parent_id, negative_parent_id = self.train_child_parent_negative_parent_triple[
             index]
 
@@ -381,17 +401,21 @@ class Data_TRAIN_Birds(Dataset):
         return positive_label_tokenized, child_image_processed, negative_label_tokenized
 
     def __getitem__(self, index):
+        """Return the encoded sample at the requested dataset index."""
         encode_parent, encode_child, encode_negative_parents = self.generate_parent_child_token_ids(
             index)
 
         return encode_parent, encode_child, encode_negative_parents
 
     def __len__(self):
+        """Return the number of available samples."""
         return len(self.train_child_parent_negative_parent_triple)
 
 
 class Data_TEST_Birds(Dataset):
+    """PyTorch test dataset for image queries and candidate bird labels."""
     def __init__(self, args):
+        """Initialize the Data_TEST_Birds object and its experiment state."""
         super(Data_TEST_Birds, self).__init__()
 
         self.args = args
@@ -419,12 +443,14 @@ class Data_TEST_Birds(Dataset):
         self.encode_query = self.generate_test_token_ids(self.test_concepts_id)
 
     def __load_data__(self, dataset):
+        """Load the serialized processed taxonomy data for this dataset."""
         with open(os.path.join("../data/", dataset, "processed", "taxonomy_data_"+str(self.args.expID)+str(self.args.negsamples)+"_.pkl"), "rb") as f:
             data = pkl.load(f)
 
         return data
 
     def generate_test_token_ids(self, test_concepts_id):
+        """Tokenize held-out query concepts for evaluation."""
         all_images = [self.id_concept[concept_id]
                       for concept_id in test_concepts_id]
 
@@ -442,25 +468,30 @@ class Data_TEST_Birds(Dataset):
 
     def tokenize_candidate_labels(self, candidate_ids):
         # for each candidate id
+        """Tokenize candidate text labels for multimodal evaluation."""
         candidate_labels = [self.id_concept[candidate_ids]]
         labels_tokenized = self.tokenizer(candidate_labels)
 
         return labels_tokenized
 
     def __getitem__(self, index):
+        """Return the encoded sample at the requested dataset index."""
         candidate_id = self.true_concept_set[index]
         tokenized_label = self.tokenize_candidate_labels(candidate_id)
 
         return tokenized_label.cuda()
 
     def __len__(self):
+        """Return the number of available samples."""
         return len(self.true_concept_set)
 
 
 class Data_TRAIN(Dataset):
 
+    """PyTorch training dataset for single-parent taxonomy learning."""
     def __init__(self, args, tokenizer):
 
+        """Initialize the Data_TRAIN object and its experiment state."""
         super(Data_TRAIN, self).__init__()
 
         self.args = args
@@ -493,6 +524,7 @@ class Data_TRAIN(Dataset):
 
     def __load_data__(self, dataset):
 
+        """Load the serialized processed taxonomy data for this dataset."""
         with open(os.path.join("../data/", dataset, "processed", "taxonomy_data_"+str(self.args.expID)+str(self.args.negsamples)+str(self.args.seed)+"_.pkl"), "rb") as f:
             data = pkl.load(f)
 
@@ -519,6 +551,7 @@ class Data_TRAIN(Dataset):
 
     def generate_all_token_ids(self, tokenizer):
 
+        """Tokenize all concept contexts used as candidate taxonomy nodes."""
         all_nodes_context = [self.id_context[cid] for cid in self.concept_set]
 
         encode_all = tokenizer(all_nodes_context, padding='max_length',
@@ -544,6 +577,7 @@ class Data_TRAIN(Dataset):
 
     def index_token_ids(self, encode_dic, index):
 
+        """Select tokenized tensors for one or more concept indices."""
         if self.args.model != 'snowflake':
             input_ids, token_type_ids, attention_mask = encode_dic[
                 "input_ids"], encode_dic["token_type_ids"], encode_dic["attention_mask"]
@@ -562,6 +596,7 @@ class Data_TRAIN(Dataset):
 
     def generate_parent_child_token_ids(self, index):
 
+        """Return encoded parent, child, and negative-parent inputs for training."""
         child_id, parent_id, negative_parent_id = self.train_child_parent_negative_parent_triple[
             index]
         encode_child = self.index_token_ids(self.encode_all, child_id)
@@ -574,6 +609,7 @@ class Data_TRAIN(Dataset):
         return encode_parent, encode_child, encode_negative_parents
 
     def __getitem__(self, index):
+        """Return the encoded sample at the requested dataset index."""
         encode_parent, encode_child, encode_negative_parents = self.generate_parent_child_token_ids(
             index)
 
@@ -581,13 +617,16 @@ class Data_TRAIN(Dataset):
 
     def __len__(self):
 
+        """Return the number of available samples."""
         return len(self.train_child_parent_negative_parent_triple)
 
 
 class Data_TEST(Dataset):
 
+    """PyTorch candidate/query dataset for single-parent taxonomy evaluation."""
     def __init__(self, args, tokenizer):
 
+        """Initialize the Data_TEST object and its experiment state."""
         super(Data_TEST, self).__init__()
 
         self.args = args
@@ -615,6 +654,7 @@ class Data_TEST(Dataset):
 
     def __load_data__(self, dataset):
 
+        """Load the serialized processed taxonomy data for this dataset."""
         with open(os.path.join("../data/", dataset, "processed", "taxonomy_data_"+str(self.args.expID)+str(self.args.negsamples)+str(self.args.seed)+"_.pkl"), "rb") as f:
             data = pkl.load(f)
 
@@ -622,6 +662,7 @@ class Data_TEST(Dataset):
 
     def generate_all_token_ids(self, tokenizer):
 
+        """Tokenize all concept contexts used as candidate taxonomy nodes."""
         all_nodes_context = [self.id_context[cid] for cid in self.concept_set]
 
         encode_all = tokenizer(all_nodes_context, padding='max_length',
@@ -671,6 +712,7 @@ class Data_TEST(Dataset):
 
     def generate_test_token_ids(self, tokenizer, test_concepts_id):
 
+        """Tokenize held-out query concepts for evaluation."""
         test_nodes_context = [self.id_context[cid] for cid in test_concepts_id]
 
         encode_all = tokenizer(test_nodes_context, padding='max_length',
@@ -697,6 +739,7 @@ class Data_TEST(Dataset):
 
     def index_token_ids(self, encode_dic, index):
 
+        """Select tokenized tensors for one or more concept indices."""
         if self.args.model != 'snowflake':
             input_ids, token_type_ids, attention_mask = encode_dic[
                 "input_ids"], encode_dic["token_type_ids"], encode_dic["attention_mask"]
@@ -715,17 +758,20 @@ class Data_TEST(Dataset):
 
     def __getitem__(self, index):
 
+        """Return the encoded sample at the requested dataset index."""
         candidate_ids = self.train_concept_set[index]
         encode_candidate = self.index_token_ids(self.encode_all, candidate_ids)
         # encode_candidate_path = self.index_token_ids(self.encode_all_paths,candidate_ids)
         return encode_candidate
 
     def __len__(self):
+        """Return the number of available samples."""
         return len(self.train_concept_set)
 
 
 def load_data(args, tokenizer, flag):
 
+    """Construct the appropriate train or test dataloader for the requested dataset."""
     if flag in set(['test', 'val']):
         shuffle_flag = False
         drop_last = False

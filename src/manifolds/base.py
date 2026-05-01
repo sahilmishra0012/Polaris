@@ -7,6 +7,7 @@ class Manifold(object):
     """
 
     def __init__(self):
+        """Initialize the Manifold object and its experiment state."""
         super().__init__()
         self.eps = 10e-8
 
@@ -76,11 +77,14 @@ class ManifoldParameter(Parameter):
     Subclass of torch.nn.Parameter for Riemannian optimization.
     """
     def __new__(cls, data, requires_grad, manifold, c):
+        """Create a manifold tensor instance."""
         return Parameter.__new__(cls, data, requires_grad)
 
     def __init__(self, data, requires_grad, manifold, c):
+        """Initialize the ManifoldParameter object and its experiment state."""
         self.c = c
         self.manifold = manifold
 
     def __repr__(self):
+        """Return the manifold tensor representation string."""
         return '{} Parameter containing:\n'.format(self.manifold.name) + super(Parameter, self).__repr__()

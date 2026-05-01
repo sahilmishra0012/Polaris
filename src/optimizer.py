@@ -6,8 +6,10 @@ from torch.optim import Optimizer
 
 class PolarEmbeddingsOptimizer(Optimizer):
 
+    """Optimizer wrapper that applies manifold-aware updates for polar embeddings."""
     def __init__(self, params, lr=1e-3, betas=(0.9, 0.999), eps=1e-8,
                  weight_decay=0):
+        """Initialize the PolarEmbeddingsOptimizer object and its experiment state."""
         if not 0.0 <= lr:
             raise ValueError("Invalid learning rate: {}".format(lr))
         if not 0.0 <= eps:
@@ -27,6 +29,7 @@ class PolarEmbeddingsOptimizer(Optimizer):
 
     @torch.no_grad()
     def step(self, closure=None):
+        """Apply one optimizer update step."""
         if closure is not None:
             with torch.enable_grad():
                 closure()
@@ -82,7 +85,9 @@ class PolarEmbeddingsOptimizer(Optimizer):
 
 class RiemannianAdam(Optimizer):
 
+    """Adam optimizer variant with post-step spherical parameter projection."""
     def __init__(self, params, lr, betas=(0.9, 0.999), eps=1e-8, weight_decay=0):
+        """Initialize the RiemannianAdam object and its experiment state."""
         if not 0.0 <= lr:
             raise ValueError(f"Invalid learning rate: {lr}")
         if not 0.0 <= eps:
@@ -98,6 +103,7 @@ class RiemannianAdam(Optimizer):
 
     @torch.no_grad()
     def step(self, closure=None):
+        """Apply one optimizer update step."""
         loss = None
 
         if closure is not None:

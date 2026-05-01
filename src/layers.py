@@ -7,11 +7,14 @@ import math
 
 
 class CartesianToPolarConverter(nn.Module):
+    """Module that converts Cartesian embeddings to polar coordinates."""
     def __init__(self):
+        """Initialize the CartesianToPolarConverter object and its experiment state."""
         super().__init__()
 
     def forward(self, e: torch.Tensor) -> torch.Tensor:
 
+        """Run the forward pass and return loss terms."""
         batch_size, d = e.shape
         if d < 2:
             raise ValueError(
@@ -51,7 +54,9 @@ class CartesianToPolarConverter(nn.Module):
 
 
 class SphericalLinear(nn.Module):
+    """Linear layer whose weights are projected onto the unit sphere."""
     def __init__(self, input_dim, output_dim, bias=False):
+        """Initialize the SphericalLinear object and its experiment state."""
         super().__init__()
 
         self.weight = nn.Parameter(torch.Tensor(output_dim, input_dim))
@@ -63,6 +68,7 @@ class SphericalLinear(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
+        """Initialize spherical layer parameters."""
         nn.init.uniform_(self.weight, -1, 1)
 
         with torch.no_grad():
@@ -72,10 +78,12 @@ class SphericalLinear(nn.Module):
 
     @torch.no_grad()
     def normalize_weights(self):
+        """Project layer weights back onto the unit sphere."""
         self.weight.data = F.normalize(self.weight.data, dim=1, p=2)
 
     def forward(self, x):
 
+        """Run the forward pass and return loss terms."""
         linear_transformation = F.linear(x, self.weight)
         spherical_projection = F.normalize(linear_transformation, p=2, dim=1)
 
@@ -88,11 +96,14 @@ class SphericalLinear(nn.Module):
 
 
 class SphericalReLU(nn.Module):
+    """ReLU activation followed by spherical normalization."""
     def __init__(self):
+        """Initialize the SphericalReLU object and its experiment state."""
         super(SphericalReLU, self).__init__()
         self.manifold = Sphere()
 
     def forward(self, x, pole):
+        """Run the forward pass and return loss terms."""
         x = self.manifold.proj_tan(pole, x)
         x = torch.relu(x)
         x = self.manifold.expmap(pole, x)
@@ -101,16 +112,21 @@ class SphericalReLU(nn.Module):
 
 
 class SphericalTanh(nn.Module):
+    """Tanh activation for spherical projection heads."""
     def __init__(self):
+        """Initialize the SphericalTanh object and its experiment state."""
         super(SphericalTanh, self).__init__()
 
     def forward(self, x):
 
+        """Run the forward pass and return loss terms."""
         return F.normalize(torch.tanh(x), p=2, dim=-1)
 
 
 class SphericalMLP(nn.Module):
+    """Two-layer projection head that outputs normalized spherical embeddings."""
     def __init__(self, input_dim, hidden, output_dim, bias=False):
+        """Initialize the SphericalMLP object and its experiment state."""
         super(SphericalMLP, self).__init__()
         self.l1 = SphericalLinear(input_dim, hidden, bias)
         self.l2 = SphericalLinear(hidden, output_dim, bias)
@@ -121,6 +137,7 @@ class SphericalMLP(nn.Module):
         # self.register_buffer("pole", pole.unsqueeze(0))
 
     def forward(self, x):
+        """Run the forward pass and return loss terms."""
         x = self.l1(x)
         x = F.normalize(torch.tanh(x), p=2, dim=-1)
         # x = self.relu(x, self.pole)
@@ -130,13 +147,16 @@ class SphericalMLP(nn.Module):
 
 
 class MLP(nn.Module):
+    """Standard two-layer projection head used for Euclidean ablations."""
     def __init__(self, input_dim, hidden, output_dim):
+        """Initialize the MLP object and its experiment state."""
         super(MLP, self).__init__()
         self.fc1 = nn.Linear(input_dim, hidden, bias=True)
         self.fc2 = nn.Linear(hidden, hidden, bias=True)
         self.fc3 = nn.Linear(hidden, output_dim, bias=True)
 
     def forward(self, x):
+        """Run the forward pass and return loss terms."""
         x = self.fc1(x)
         x = F.relu(x)
         x = self.fc3(x)
@@ -144,13 +164,16 @@ class MLP(nn.Module):
 
 
 class SphericalProjectionHeadPsiOnly(nn.Module):
+    """Projection head that returns latitudinal spherical coordinates."""
     def __init__(self, args):
 
+        """Initialize the SphericalProjectionHeadPsiOnly object and its experiment state."""
         super().__init__()
         self.args = args
 
     def differentiable_cartesian_to_psi(self, cartesian_vectors: torch.Tensor) -> torch.Tensor:
 
+        """Differentiably convert Cartesian vectors to latitudinal angles."""
         norm = torch.norm(cartesian_vectors, p=2, dim=1, keepdim=True)
         unit_vectors = cartesian_vectors / (norm + 1e-9)
 
@@ -180,19 +203,23 @@ class SphericalProjectionHeadPsiOnly(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
 
+        """Run the forward pass and return loss terms."""
         psi = self.differentiable_cartesian_to_psi(x)
         return psi
 
 
 class SphericalProjectionHead(nn.Module):
+    """Projection head that returns full spherical coordinate parameters."""
     def __init__(self, args, input_dim, feature_dim, e_dim):
 
+        """Initialize the SphericalProjectionHead object and its experiment state."""
         super().__init__()
 
         self.args = args
 
     def differentiable_cartesian_to_polar(self, cartesian_vectors):
 
+        """Differentiably convert Cartesian vectors to spherical angles."""
         norm = torch.norm(cartesian_vectors, p=2, dim=1, keepdim=True)
         unit_vectors = cartesian_vectors / (norm + 1e-9)
 
@@ -232,6 +259,7 @@ class SphericalProjectionHead(nn.Module):
         return final_theta, final_psi
 
     def forward(self, x):
+        """Run the forward pass and return loss terms."""
         cartesian_unit_vectors = x / \
             torch.norm(x, p=2, dim=1, keepdim=True)
         print("Norm: ", torch.norm(x, p=2, dim=1, keepdim=True))

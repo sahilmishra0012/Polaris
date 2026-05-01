@@ -86,7 +86,7 @@ parser.add_argument('--resume', type=str, default='no', help='Resume a run')
 parser.add_argument('--run_id', type=str, default='',
                     help='Wandb run id for resumption')
 parser.add_argument('--entity', type=str,
-                    default='entity', help='wandb entity')
+                    default='uaena', help='wandb entity')
 parser.add_argument('--checkpoint_path', type=str,
                     default=None, help='checkpoint path to resume training')
 parser.add_argument('--experiment_setting', type=str,
@@ -95,10 +95,14 @@ parser.add_argument('--kernel_setting', type=str,
                     default='vmf_theta', help='kernel setting for SVGD')
 parser.add_argument('--learn_mu', type=int, default=1,
                     help='If mu needs to be learned during training')
+parser.add_argument('--detach_svgd', type=int, default=0,
+                    help='detach SVGD from training')
 parser.add_argument('--learn_kappa', type=int, default=1,
                     help='If kappa parameter of VMF needs to be learned during training')
 parser.add_argument('--implement_rectangular_opt', type=bool, default=False,
                     help='Optimizes parameters on a Grid instead of a Sphere')
+parser.add_argument('--potential_strength', type=float,
+                    default=0.5, help='Potential Strength')
 
 
 start_time = time.time()
@@ -109,6 +113,7 @@ args = parser.parse_args()
 
 
 def experiment(args):
+    """Run preprocessing when needed, initialize the experiment driver, and train the model."""
     torch.set_float32_matmul_precision('high')
     args.cuda = torch.cuda.is_available() and args.cuda == True
 
@@ -163,9 +168,9 @@ def experiment(args):
 
 
 if __name__ == '__main__':
-    args.gpu_id = 1
-    args.expID = 50
-    args.batch_size = 512
+    args.gpu_id = 0
+    args.expID = 510
+    args.batch_size = 1024
     args.accumulation_steps = 5
     args.geometric_weight = 0.7
     args.c = 0.4
@@ -175,14 +180,15 @@ if __name__ == '__main__':
         args.negsamples = 20
         args.epochs = 50
         args.embed_size = 128
+        args.batch_size = 256
     elif args.dataset == 'wordnet_verb':
         args.negsamples = 20
         args.epochs = 30
         args.embed_size = 256
     elif args.dataset == 'birds':
         args.negsamples = 5
-        args.epochs = 55
-        args.embed_size = 64
+        args.epochs = 150
+        args.embed_size = 256
     elif args.dataset == 'semeval_food':
         args.gpu_id = 1
         args.epochs = 200

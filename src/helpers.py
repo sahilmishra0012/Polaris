@@ -10,6 +10,7 @@ data_dir = Path(__file__).parent
 
 
 def set_seed(seed):
+    """Set Python, NumPy, and PyTorch random seeds for reproducible runs."""
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)

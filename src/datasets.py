@@ -20,7 +20,9 @@ date_time = datetime.datetime.now().strftime("%d-%b-%Y (%H:%M:%S.%f)")
 
 
 class Taxon(object):
+    """Container for a taxonomy concept and its graph metadata."""
     def __init__(self, tx_id, rank=-1, norm_name="none", display_name="None", main_type="", level="-100", p_count=0, c_count=0, create_date="None"):
+        """Initialize the Taxon object and its experiment state."""
         self.tx_id = tx_id
         self.rank = int(rank)
         self.norm_name = norm_name
@@ -32,9 +34,11 @@ class Taxon(object):
         self.create_date = create_date
 
     def __str__(self):
+        """Return a compact human-readable representation."""
         return "Taxon {} (name: {}, level: {})".format(self.tx_id, self.norm_name, self.level)
 
     def __lt__(self, another_taxon):
+        """Compare taxonomy nodes by level and rank for sorting."""
         if self.level < another_taxon.level:
             return True
         else:
@@ -42,7 +46,9 @@ class Taxon(object):
 
 
 class MAGDatasetCorrected(object):
+    """Prepare an edge-partitioned MAG-style taxonomy dataset."""
     def __init__(self, name, path):
+        """Initialize the MAGDatasetCorrected object and its experiment state."""
         self.name = name
         self.taxonomy = None
         self.all_nodes = None
@@ -54,6 +60,7 @@ class MAGDatasetCorrected(object):
         self._load_and_partition(path)
 
     def _load_and_partition(self, dir_path):
+        """Load raw taxonomy files and partition edges into train/test splits."""
         node_file_name = os.path.join(dir_path, f"{self.name}.terms")
         edge_file_name = os.path.join(dir_path, f"{self.name}.taxo")
 
@@ -116,26 +123,31 @@ class MAGDatasetCorrected(object):
         self._create_new_edges_file()
 
     def _create_new_taxo_file(self, graph, split):
+        """Write generated taxonomy edges for the requested split."""
         with open(f"../data/{self.name}/{self.name}_{split}.taxo", "w") as f:
             for u, v in graph.edges():
 
                 f.write(f"{u.tx_id}\t{v.tx_id}\n")
 
     def _create_new_edges_file(self):
+        """Write held-out test edges to disk."""
         with open(f"../data/{self.name}/{self.name}_test.taxo", "w") as f:
             for u, v in self.test_edges:
                 f.write(f"{u.tx_id}\t{v.tx_id}\n")
 
 
 class BirdsImagesDataset(object):
+    """Split bird image taxonomy edges into train and test files."""
     def __init__(self, edges_path):
+        """Initialize the BirdsImagesDataset object and its experiment state."""
         self.edges_path = edges_path
-        self.test_ratio = 0.20
+        self.test_ratio = 0.25
 
         self.perform_edges_split()
 
     def perform_edges_split(self):
 
+        """Split image taxonomy edges and write train/test files."""
         edges = list()
         with open(self.edges_path, 'r', newline='', encoding='utf-8') as f:
             reader = csv.reader(f, delimiter='\t')
@@ -147,14 +159,14 @@ class BirdsImagesDataset(object):
             edges, test_size=self.test_ratio)
 
         print("Saving train edges...")
-        with open('../data/birds/birds_train.taxo', 'w', newline='') as f:
+        with open('../data/birds/birds_train_full.taxo', 'w', newline='') as f:
             writer = csv.writer(f, delimiter='\t')
 
             for train_edge in train_edges:
                 writer.writerow(train_edge)
 
         print("Saving test edges...")
-        with open('../data/birds/birds_test.taxo', 'w', newline='') as f:
+        with open('../data/birds/birds_test_full.taxo', 'w', newline='') as f:
             writer = csv.writer(f, delimiter='\t')
 
             for test_edge in test_edges:
@@ -162,7 +174,9 @@ class BirdsImagesDataset(object):
 
 
 class MAGDataset(object):
+    """Load, partition, and serialize MAG-style taxonomy graphs."""
     def __init__(self, name, path, existing_partition=True, partition_pattern='leaf', shortest_path=False):
+        """Initialize the MAGDataset object and its experiment state."""
         self.name = name
         self.existing_partition = existing_partition
         self.partition_pattern = partition_pattern
@@ -174,6 +188,7 @@ class MAGDataset(object):
         self._load_dataset_raw(path)
 
     def _load_dataset_raw(self, dir_path):
+        """Load raw taxonomy nodes and edges, then build train/test graph partitions."""
         print("Loading nodes and edges files")
         node_file_name = os.path.join(dir_path, f"{self.name}.terms")
         edge_file_name = os.path.join(dir_path, f"{self.name}.taxo")
@@ -347,6 +362,7 @@ class MAGDataset(object):
                     f.write(f"{n.tx_id}\t{n.norm_name}\n")
 
     def _load_node_list(self, file_path):
+        """Read a list of taxonomy node identifiers from a terms file."""
         node_list = []
         with open(file_path, "r") as fin:
             for line in fin:
@@ -356,6 +372,7 @@ class MAGDataset(object):
         return node_list
 
     def _get_holdout_subgraph(self, node_ids):
+        """Create a holdout subgraph while preserving reachable taxonomy structure."""
         tx_ids = [n.tx_id for n in node_ids]
         node_to_remove = [
             n for n in self.taxonomy.nodes if n.tx_id not in tx_ids]
@@ -398,6 +415,7 @@ class MAGDataset(object):
         return subgraph
 
     def _check_cycle(self):
+        """Report whether the taxonomy contains an undirected cycle."""
         ud_train = self.taxonomy.to_undirected()
 
         try:
@@ -411,6 +429,7 @@ class MAGDataset(object):
 
     def _replicate_and_attach_subgraph(self, tree, dag, parent_in_tree, dag_node_to_replicate, replication_counters):
 
+        """Replicate a shared DAG subgraph while converting it to a tree."""
         replication_queue = deque()
 
         replication_counters[dag_node_to_replicate] += 1
@@ -435,6 +454,7 @@ class MAGDataset(object):
                 replication_queue.append((new_child_copy, repl_child_dag_node))
 
     def _dag_to_tree_(self, dag):
+        """Convert a rooted DAG taxonomy into a tree by duplicating shared descendants."""
         if not nx.is_directed_acyclic_graph(dag):
             raise ValueError("Input graph must be a DAG.")
 
@@ -471,6 +491,7 @@ class MAGDataset(object):
         return tree
 
     def _create_new_taxo_file(self):
+        """Write generated taxonomy edges for the requested split."""
         with open(f"../data/{self.name}/{self.name}_train.taxo", "w") as f:
             for u, v in self.train_subgraph.edges():
                 if u.tx_id != 'root':
@@ -487,6 +508,7 @@ class MAGDataset(object):
                     f.write(f"{u.tx_id}\t{v.tx_id}\n")
 
     def _append_new_terms_file(self):
+        """Append the pseudo-root term to the terms file."""
         with open(f"../data/{self.name}/{self.name}.terms", "a") as f:
 
             f.write(f"{'root'}\t{'root'}\n")

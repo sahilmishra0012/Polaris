@@ -1,18 +1,18 @@
 # Polaris
 
-Official research code for coupled orbital embeddings for learning hierarchies. 
+Official code of Polaris accepted in ICML 2026.
 
 ## Project Layout
 
 ```text
-Polartaxo/
+Polaris/
 +-- readme.md
 +-- image_taxo.py
 +-- src/
     +-- main.py          # training entry point
     +-- main_pred.py     # checkpoint evaluation / prediction entry point
     +-- exp.py           # experiment driver: train, evaluate, visualize
-    +-- model.py         # PolarTaxo model
+    +-- model.py         # Polaris model
     +-- data.py          # PyTorch datasets and dataloaders
     +-- pre_process.py   # taxonomy preprocessing utilities
     +-- utils.py         # metrics and plotting utilities
@@ -30,8 +30,8 @@ The project expects a Python environment with PyTorch, Transformers, NetworkX, s
 Example setup:
 
 ```bash
-conda create -n polartaxo python=3.10
-conda activate polartaxo
+conda create -n polaris python=3.12
+conda activate polaris
 pip install torch transformers networkx scikit-learn pandas matplotlib seaborn tqdm wandb open_clip_torch pillow
 ```
 
@@ -188,3 +188,6 @@ taxonomy_data_<expID><negsamples><seed>_.pkl
 ```
 
 For deterministic comparisons, keep `--seed`, dataset-specific overrides, pretrained backbone paths, and checkpoint paths fixed across runs.
+
+## Questions
+If you have any questions in running the code, you may email us and we will try to resolve it asap. 

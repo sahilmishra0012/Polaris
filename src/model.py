@@ -16,6 +16,7 @@ import open_clip
 
 class PolarTaxo(nn.Module):
     """Polar orbital embedding model for taxonomy representation learning on spheres."""
+
     def __init__(self, args):
         """Initialize the PolarTaxo object and its experiment state."""
         super(PolarTaxo, self).__init__()
@@ -126,7 +127,6 @@ class PolarTaxo(nn.Module):
         return psi, theta
 
     def par_projection(self, cls_embed):
-
         """Project parent or candidate text embeddings onto the learned sphere."""
         cls_embeddings = self.get_cls(cls_embed)
         v = self.manifold.proj_tan(self.pole, cls_embeddings)
@@ -137,7 +137,6 @@ class PolarTaxo(nn.Module):
         return e
 
     def child_projection(self, cls_embed):
-
         """Project child or query text embeddings onto the learned sphere."""
         cls_embeddings = self.get_cls(cls_embed)
         v = self.manifold.proj_tan(self.pole, cls_embeddings)
@@ -148,7 +147,6 @@ class PolarTaxo(nn.Module):
         return e
 
     def to_polar(self, e):
-
         """Convert normalized Cartesian embeddings into polar angular coordinates."""
         batch_size, d = e.shape
         if d < 2:
@@ -194,7 +192,6 @@ class PolarTaxo(nn.Module):
         self.child_sphere.l2.normalize_weights()
 
     def angular_loss(self, psi1, psi2):
-
         """Compute aggregate latitudinal angular distance."""
         return torch.sum(torch.abs(psi1-psi2), dim=1)
 
@@ -208,12 +205,15 @@ class PolarTaxo(nn.Module):
         return torch.sum(shortest_arc, dim=1)
 
     def welsch_loss(self, d):
-
         """Compute the Welsch robust loss for angular distances."""
         w_loss = (self.args.c**2/2)*(1 -
                                      torch.exp(-(d**2/(2*self.args.c**2))))
 
         return w_loss
+
+    def log_welsch_loss(self, d):
+        """Compute a numerically stable log-Welsch loss."""
+        return torch.log(self.welsch_loss(d).clamp_min(self.args.eps))
 
     def forward(self, step, encode_parent, encode_child, encode_negative):
         """Run the forward pass and return loss terms."""
@@ -227,13 +227,13 @@ class PolarTaxo(nn.Module):
 
             cp_loss = self.angular_loss(parent_psi, child_psi)
             cn_loss = self.angular_loss(negative_psi, child_psi)
-            welsch_cp = torch.log(self.welsch_loss(cp_loss))
-            welsch_cn = torch.log(self.welsch_loss(cn_loss))
+            welsch_cp = self.log_welsch_loss(cp_loss)
+            welsch_cn = self.log_welsch_loss(cn_loss)
 
             cp_long_loss = self.longitudinal_loss(parent_theta, child_theta)
             cn_long_loss = self.longitudinal_loss(negative_theta, child_theta)
-            welsch_cp_long = torch.log(self.welsch_loss(cp_long_loss))
-            welsch_cn_long = torch.log(self.welsch_loss(cn_long_loss))
+            welsch_cp_long = self.log_welsch_loss(cp_long_loss)
+            welsch_cn_long = self.log_welsch_loss(cn_long_loss)
 
             taxo_loss = F.relu(welsch_cp-welsch_cn+self.args.beta).mean() + \
                 F.relu(welsch_cp_long-welsch_cn_long+self.args.beta).mean()
@@ -280,8 +280,8 @@ class PolarTaxo(nn.Module):
             ang_distcp = torch.acos(dot_cp)
             ang_distcn = torch.acos(dot_cn)
 
-            welsch_cp = torch.log(self.welsch_loss(ang_distcp))
-            welsch_cn = torch.log(self.welsch_loss(ang_distcn))
+            welsch_cp = self.log_welsch_loss(ang_distcp)
+            welsch_cn = self.log_welsch_loss(ang_distcn)
 
             loss_vmf, mu_p, mu_c, mu_n = self.vmf_regulariser(
                 parent_sphere, child_sphere, negative_sphere, self.args.vmf_margin)
@@ -315,16 +315,21 @@ class PolarTaxo(nn.Module):
                     svgd_combined = SVGD_Combined_Sphere(
                         kappa_align=k_align, kappa_repel=k_repel)
 
-                if self.args.experiment_setting == 'constant_svgd':
-                    parent_svgd_grad = svgd_combined(
-                        parent_sphere, parent_sphere)
-                    child_svgd_grad = svgd_combined(child_sphere, child_sphere)
-                    negative_svgd_grad = svgd_combined(
-                        negative_sphere, negative_sphere)
+                    if self.args.experiment_setting == 'constant_svgd':
+                        parent_svgd_grad = svgd_combined(
+                            parent_sphere, parent_sphere)
+                        child_svgd_grad = svgd_combined(
+                            child_sphere, child_sphere)
+                        negative_svgd_grad = svgd_combined(
+                            negative_sphere, negative_sphere)
+                    else:
+                        parent_svgd_grad = svgd_combined(parent_sphere, mu_p)
+                        child_svgd_grad = svgd_combined(child_sphere, mu_c)
+                        negative_svgd_grad = svgd_combined(
+                            negative_sphere, mu_n)
                 else:
-                    parent_svgd_grad = svgd_combined(parent_sphere, mu_p)
-                    child_svgd_grad = svgd_combined(child_sphere, mu_c)
-                    negative_svgd_grad = svgd_combined(negative_sphere, mu_n)
+                    raise ValueError(
+                        f"Unsupported SVGD kernel setting: {self.args.kernel_setting}")
 
                 taxo_loss = self.args.geometric_weight * \
                     F.relu(welsch_cp-welsch_cn+self.args.beta).mean() + \
@@ -338,6 +343,7 @@ class PolarTaxo(nn.Module):
                     F.relu(welsch_cp-welsch_cn+self.args.beta).mean() + \
                     (1-self.args.geometric_weight)*loss_vmf
                 final_loss = taxo_loss
-                svgd_loss = torch.tensor(0)
+                svgd_loss = torch.zeros((), device=taxo_loss.device,
+                                        dtype=taxo_loss.dtype)
 
         return final_loss, taxo_loss, svgd_loss

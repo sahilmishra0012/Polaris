@@ -15,6 +15,18 @@ os.environ["WANDB_MODE"] = "online"
 parser = argparse.ArgumentParser()
 
 
+def str2bool(value):
+    """Parse common command-line boolean spellings."""
+    if isinstance(value, bool):
+        return value
+    value = value.lower()
+    if value in {"true", "1", "yes", "y"}:
+        return True
+    if value in {"false", "0", "no", "n"}:
+        return False
+    raise argparse.ArgumentTypeError("Boolean value expected.")
+
+
 # General ML hyperparameters
 parser.add_argument('--dataset', type=str,
                     default='environment', help='dataset')
@@ -58,7 +70,7 @@ parser.add_argument('--vmf_margin', type=float,
                     default=0.5, help='Margin for VMF loss')
 parser.add_argument('--c', type=float, default=0.7,
                     help='parameter c for welsch loss')
-parser.add_argument('--is_multi_parent', type=bool,
+parser.add_argument('--is_multi_parent', type=str2bool,
                     default=True, help='If it is a multi parent taxonomy')
 parser.add_argument('--geometric_weight', type=float,
                     default=0.5, help='Importance of Geometric Loss')
@@ -72,7 +84,7 @@ parser.add_argument('--kappa_repel', help='Kappa repulsion',
                     type=float, default=4.5)
 
 # Others
-parser.add_argument('--cuda', type=bool, default=True,
+parser.add_argument('--cuda', type=str2bool, default=True,
                     help='use cuda for training')
 parser.add_argument('--gpu_id', type=int, default=2, help='which gpu')
 parser.add_argument('--seed', type=int, default=20,
@@ -99,7 +111,7 @@ parser.add_argument('--detach_svgd', type=int, default=0,
                     help='detach SVGD from training')
 parser.add_argument('--learn_kappa', type=int, default=1,
                     help='If kappa parameter of VMF needs to be learned during training')
-parser.add_argument('--implement_rectangular_opt', type=bool, default=False,
+parser.add_argument('--implement_rectangular_opt', type=str2bool, default=False,
                     help='Optimizes parameters on a Grid instead of a Sphere')
 parser.add_argument('--potential_strength', type=float,
                     default=0.5, help='Potential Strength')

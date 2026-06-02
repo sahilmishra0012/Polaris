@@ -51,7 +51,7 @@ class Experiments(object):
                 self.args, self.tokenizer, flag='train')
             self.test_loader, self.test_set = load_data(
                 self.args, self.tokenizer, flag='test')
-        self.accumulation_steps = self.args.accumulation_steps
+        self.accumulation_steps = max(1, int(self.args.accumulation_steps))
 
         self.model = PolarTaxo(self.args)
 
@@ -97,7 +97,7 @@ class Experiments(object):
         if self.args.cuda:
             self.model = self.model.cuda()
 
-    def train_one_step(self, it, encode_parent, encode_child, encode_negative):
+    def train_one_step(self, it, encode_parent, encode_child, encode_negative, should_step=True):
 
         """Run one optimization step for a mini-batch."""
         self.model.train()
@@ -114,13 +114,14 @@ class Experiments(object):
                 taxo_loss, final_embedding_layers)
             taxo_grads_to_log = self.grad_logger.get_loggable_dict()
 
-        loss.backward()
+        (loss / self.accumulation_steps).backward()
 
-        self.optimizer.step()
+        if should_step:
+            self.optimizer.step()
 
-        if self.args.implement_rectangular_opt is False:
-            self.model.normalize_spherical_weights()
-        self.optimizer.zero_grad()
+            if self.args.implement_rectangular_opt is False:
+                self.model.normalize_spherical_weights()
+            self.optimizer.zero_grad()
 
         del encode_parent, encode_child, encode_negative
 
@@ -157,8 +158,13 @@ class Experiments(object):
 
             self.optimizer.zero_grad()
             for i, (encode_parent, encode_child, encode_negative) in tqdm(enumerate(self.train_loader), total=len(self.train_loader)):
+                should_step = (
+                    (i + 1) % self.accumulation_steps == 0
+                    or (i + 1) == len(self.train_loader)
+                )
                 loss, svgd_loss, taxo_grad_log = self.train_one_step(
-                    it=i, encode_parent=encode_parent, encode_child=encode_child, encode_negative=encode_negative)
+                    it=i, encode_parent=encode_parent, encode_child=encode_child,
+                    encode_negative=encode_negative, should_step=should_step)
 
                 train_loss.append(loss.item())
                 svgd_losses.append(svgd_loss.item())
@@ -291,7 +297,7 @@ class Experiments(object):
                     encode_candidate)
                 candidate_k = self.model.vmf_regulariser.kappa_predictor(
                     candidate_sphere)
-                candidate_mu = self.model.vmf_regulariser.kappa_predictor(
+                candidate_mu = self.model.vmf_regulariser.mu_predictor(
                     candidate_sphere)
 
                 candidates_sphere.append(candidate_sphere)

@@ -11,6 +11,19 @@ os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 
 parser = argparse.ArgumentParser()
 
+
+def str2bool(value):
+    """Parse common command-line boolean spellings."""
+    if isinstance(value, bool):
+        return value
+    value = value.lower()
+    if value in {"true", "1", "yes", "y"}:
+        return True
+    if value in {"false", "0", "no", "n"}:
+        return False
+    raise argparse.ArgumentTypeError("Boolean value expected.")
+
+
 parser.add_argument('--dataset', type=str,
                     default='environment', help='dataset')
 parser.add_argument('--pre_train', type=str,
@@ -45,7 +58,7 @@ parser.add_argument('--vmf_margin', type=float,
                     default=0.5, help='Margin for VMF loss')
 parser.add_argument('--c', type=float, default=0.5,
                     help='parameter c for welsch loss')
-parser.add_argument('--is_multi_parent', type=bool,
+parser.add_argument('--is_multi_parent', type=str2bool,
                     default=False, help='If it is a multi parent taxonomy')
 parser.add_argument('--geometric_weight', type=float,
                     default=0.5, help='Importance of Geometric Loss')
@@ -61,7 +74,7 @@ parser.add_argument('--potential_strength',
 
 
 # Others
-parser.add_argument('--cuda', type=bool, default=True,
+parser.add_argument('--cuda', type=str2bool, default=True,
                     help='use cuda for training')
 parser.add_argument('--gpu_id', type=int, default=0, help='which gpu')
 parser.add_argument('--seed', type=int, default=20,
@@ -92,7 +105,7 @@ parser.add_argument('--learn_mu', type=int, default=1,
                     help='If mu needs to be learned during training')
 parser.add_argument('--learn_kappa', type=int, default=1,
                     help='If kappa parameter of VMF needs to be learned during training')
-parser.add_argument('--implement_rectangular_opt', type=bool, default=False,
+parser.add_argument('--implement_rectangular_opt', type=str2bool, default=False,
                     help='Optimizes parameters on a Grid instead of a Sphere')
 
 
@@ -101,10 +114,11 @@ print("Start time at : ")
 print_aoe_time()
 
 args = parser.parse_args()
-args.cuda = True  # inference
+args.cuda = torch.cuda.is_available() and args.cuda
 
 
-torch.cuda.set_device(args.gpu_id)
+if args.cuda:
+    torch.cuda.set_device(args.gpu_id)
 exp = Experiments(args)
 exp.level_wise_prediction(
     tag='test', path=args.model_path)
